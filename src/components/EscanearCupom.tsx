@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+// import { Html5Qrcode } from 'html5-qrcode'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
@@ -85,9 +85,9 @@ export function EscanearCupom() {
     setErro(null)
 
     try {
-      const scanner = new Html5Qrcode('qr-reader-hidden')
-      const result = await scanner.scanFileV2(file, true)
-      setConteudoLido(result.decodedText)
+      // const scanner = new Html5Qrcode('qr-reader-hidden')
+      // const result = await scanner.scanFileV2(file, true)
+      // setConteudoLido(result.decodedText)
     } catch (e) {
       console.error('Erro ao ler imagem:', e)
       setErro('Não foi possível ler o QR code da imagem. Tente uma foto com melhor qualidade ou use a opção manual.')
