@@ -31,6 +31,21 @@ interface GastosMensais {
   notas: NotaFiscal[];
 }
 
+interface Categoria {
+  _id: string;
+  codigo: string;
+  nome: string;
+  descricao: string;
+  icone: string;
+  cor: string;
+}
+
+interface Prefixo {
+  _id: string;
+  prefixo: string;
+  categoria: Categoria;
+}
+
 export function Dashboard() {
   const [notas, setNotas] = useState<NotaFiscal[]>([]);
   const [gastosPorMes, setGastosPorMes] = useState<GastosMensais[]>([]);
@@ -39,25 +54,75 @@ export function Dashboard() {
   );
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
 
   useEffect(() => {
-    carregarNotas();
+    carregarDados();
   }, []);
 
-  const carregarNotas = async () => {
+  const carregarDados = async () => {
     try {
-      const response = await fetch(`${API_URL}/notas-fiscais`);
-      if (!response.ok) {
+      const [notasRes, prefixosRes] = await Promise.all([
+        fetch(`${API_URL}/notas-fiscais`),
+        fetch(`${API_URL}/categorias/prefixos/listar`),
+      ]);
+
+      if (!notasRes.ok) {
         throw new Error("Erro ao carregar notas fiscais");
       }
-      const data: NotaFiscal[] = await response.json();
-      setNotas(data);
-      calcularGastosPorMes(data);
+
+      const notasData: NotaFiscal[] = await notasRes.json();
+      const prefixosData: Prefixo[] = prefixosRes.ok ? await prefixosRes.json() : [];
+
+      setNotas(notasData);
+      setPrefixos(prefixosData);
+      calcularGastosPorMes(notasData);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro desconhecido");
     } finally {
       setCarregando(false);
     }
+  };
+
+  const extrairNomeProduto = (nomeCompleto: string): { nomePrincipal: string; nomeSecundario: string | null } => {
+    const partes = nomeCompleto.split(/\s+/);
+    const indicePHIG = partes.findIndex((parte) => parte.toUpperCase() === "P" && partes[partes.indexOf(parte) + 1]?.toUpperCase().startsWith("HIG"));
+    
+    if (indicePHIG !== -1) {
+      const nomePrincipal = partes.slice(0, indicePHIG).join(" ");
+      const nomeSecundario = partes.slice(indicePHIG).join(" ");
+      return { nomePrincipal, nomeSecundario };
+    }
+
+    const indiceP = partes.findIndex((parte, idx) => 
+      parte.toUpperCase() === "P" && idx > 0 && partes.length > idx + 1
+    );
+    
+    if (indiceP !== -1 && indiceP > 0) {
+      const segundaParte = partes.slice(indiceP).join(" ");
+      if (segundaParte.length >= 3) {
+        return {
+          nomePrincipal: partes.slice(0, indiceP).join(" "),
+          nomeSecundario: segundaParte,
+        };
+      }
+    }
+
+    return { nomePrincipal: nomeCompleto, nomeSecundario: null };
+  };
+
+  const obterCategoriaProduto = (nomeProduto: string): Categoria | null => {
+    const nomeUpper = nomeProduto.toUpperCase();
+    
+    const prefixosOrdenados = [...prefixos].sort((a, b) => b.prefixo.length - a.prefixo.length);
+    
+    for (const prefixo of prefixosOrdenados) {
+      if (nomeUpper.startsWith(prefixo.prefixo.toUpperCase())) {
+        return prefixo.categoria;
+      }
+    }
+    
+    return null;
   };
 
   const calcularGastosPorMes = (notas: NotaFiscal[]) => {
@@ -140,7 +205,7 @@ export function Dashboard() {
         <div className="bg-red-50 text-red-700 p-6 rounded-lg text-center">
           <p className="mb-4">{erro}</p>
           <button
-            onClick={carregarNotas}
+            onClick={carregarDados}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             Tentar novamente
@@ -261,21 +326,44 @@ export function Dashboard() {
                           Ver {nota.produtos.length} produto
                           {nota.produtos.length !== 1 ? "s" : ""}
                         </summary>
-                        <ul className="mt-2 space-y-1 pl-4 border-l-2 border-gray-200">
-                          {nota.produtos.map((produto, idx) => (
-                            <li
-                              key={idx}
-                              className="text-sm flex justify-between"
-                            >
-                              <span className="text-gray-600">
-                                {produto.quantidade} {produto.unidade} -{" "}
-                                {produto.nome}
-                              </span>
-                              <span className="text-gray-800 font-medium">
-                                {formatarMoeda(produto.valorTotal)}
-                              </span>
-                            </li>
-                          ))}
+                        <ul className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200">
+                          {nota.produtos.map((produto, idx) => {
+                            const { nomePrincipal, nomeSecundario } = extrairNomeProduto(produto.nome);
+                            const categoria = obterCategoriaProduto(produto.nome);
+                            
+                            return (
+                              <li
+                                key={idx}
+                                className="text-sm flex justify-between items-start gap-2"
+                              >
+                                <div className="flex-1">
+                                  <span className="text-gray-600">
+                                    {produto.quantidade} {produto.unidade} -{" "}
+                                    {nomePrincipal}
+                                    {nomeSecundario && (
+                                      <span className="text-gray-400 text-xs ml-1">
+                                        ({nomeSecundario})
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-xs px-2 py-0.5 rounded-full ${
+                                      categoria
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-500"
+                                    }`}
+                                  >
+                                    {categoria?.nome || "Outros"}
+                                  </span>
+                                  <span className="text-gray-800 font-medium whitespace-nowrap">
+                                    {formatarMoeda(produto.valorTotal)}
+                                  </span>
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </details>
                     )}
