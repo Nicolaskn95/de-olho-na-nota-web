@@ -31,6 +31,18 @@ export default function RootLayout({
             >
               Dashboard
             </Link>
+            <Link
+              href="/categorias"
+              className="hover:text-green-200 transition-colors"
+            >
+              Categorias
+            </Link>
+            <Link
+              href="/financeiro"
+              className="hover:text-green-200 transition-colors"
+            >
+              Financeiro
+            </Link>
           </div>
         </nav>
         {children}
