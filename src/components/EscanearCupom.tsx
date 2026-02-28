@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 interface NotaFiscalResponse {
   _id: string;
@@ -44,7 +44,7 @@ export function EscanearCupom() {
 
     setProcessando(true);
     setErro(null);
-
+    console.log(API_URL);
     try {
       const response = await fetch(`${API_URL}/notas-fiscais/processar`, {
         method: "POST",
@@ -87,14 +87,30 @@ export function EscanearCupom() {
     setCarregandoImagem(true);
     setErro(null);
 
+    const formatosSuportados = [
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.DATA_MATRIX,
+      Html5QrcodeSupportedFormats.AZTEC,
+      Html5QrcodeSupportedFormats.PDF_417,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+    ];
+
     try {
-      const scanner = new Html5Qrcode("qr-reader-hidden");
+      const scanner = new Html5Qrcode("qr-reader-hidden", {
+        formatsToSupport: formatosSuportados,
+        verbose: false,
+      });
       const result = await scanner.scanFileV2(file, true);
       setConteudoLido(result.decodedText);
     } catch (e) {
       console.error("Erro ao ler imagem:", e);
       setErro(
-        "Não foi possível ler o QR code da imagem. Tente uma foto com melhor qualidade ou use a opção manual.",
+        "Não foi possível ler o código da imagem. Dicas: certifique-se que o código está nítido, bem iluminado e centralizado na foto. Ou use a opção manual.",
       );
     } finally {
       setCarregandoImagem(false);
