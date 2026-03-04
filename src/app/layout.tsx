@@ -26,10 +26,10 @@ export default function RootLayout({
               Escanear Cupom
             </Link>
             <Link
-              href="/dashboard"
+              href="/notas-fiscais"
               className="hover:text-green-200 transition-colors"
             >
-              Dashboard
+              Notas Fiscais
             </Link>
             <Link
               href="/categorias"

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { Scanner } from "@yudiel/react-qr-scanner";
+import { Html5Qrcode } from "html5-qrcode";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -87,30 +88,15 @@ export function EscanearCupom() {
     setCarregandoImagem(true);
     setErro(null);
 
-    const formatosSuportados = [
-      Html5QrcodeSupportedFormats.QR_CODE,
-      Html5QrcodeSupportedFormats.DATA_MATRIX,
-      Html5QrcodeSupportedFormats.AZTEC,
-      Html5QrcodeSupportedFormats.PDF_417,
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-    ];
-
     try {
-      const scanner = new Html5Qrcode("qr-reader-hidden", {
-        formatsToSupport: formatosSuportados,
-        verbose: false,
-      });
+      const scanner = new Html5Qrcode("qr-reader-hidden", { verbose: false });
       const result = await scanner.scanFileV2(file, true);
       setConteudoLido(result.decodedText);
+      setErro(null);
     } catch (e) {
       console.error("Erro ao ler imagem:", e);
       setErro(
-        "Não foi possível ler o código da imagem. Dicas: certifique-se que o código está nítido, bem iluminado e centralizado na foto. Ou use a opção manual.",
+        "Não foi possível ler o QR code da imagem. Tente uma foto com melhor qualidade ou use a opção manual.",
       );
     } finally {
       setCarregandoImagem(false);
@@ -120,14 +106,14 @@ export function EscanearCupom() {
 
   return (
     <div className="max-w-lg mx-auto p-6">
-      <div id="qr-reader-hidden" className="hidden" />
-
+      <div id="qr-reader-hidden" className="hidden" aria-hidden="true" />
       <header className="text-center mb-8">
         <h1 className="text-3xl font-bold text-green-800 mb-2">
           De Olho na Nota
         </h1>
         <p className="text-gray-600">
-          Envie uma foto do QR code do cupom fiscal para extrair os produtos
+          Use a câmera, envie uma foto do QR code ou insira a URL manualmente
+          para extrair os produtos
         </p>
       </header>
 
@@ -149,13 +135,47 @@ export function EscanearCupom() {
 
       {!conteudoLido && !modoManual && !erro && (
         <div className="flex flex-col items-center gap-6">
+          <div className="w-full rounded-xl overflow-hidden border border-green-500 bg-black">
+            <Scanner
+              onScan={(detectedCodes) => {
+                if (!detectedCodes || detectedCodes.length === 0) return;
+                const value = detectedCodes[0]?.rawValue;
+                if (!value) return;
+                setConteudoLido(value);
+                setErro(null);
+              }}
+              onError={(error) => {
+                console.error("Erro no scanner:", error);
+              }}
+              constraints={{
+                facingMode: "environment",
+              }}
+              paused={!!conteudoLido}
+              styles={{
+                container: {
+                  width: "100%",
+                },
+                video: {
+                  width: "100%",
+                  objectFit: "cover",
+                },
+              }}
+            />
+          </div>
+
+          <div className="flex items-center w-full gap-4 text-gray-400 text-sm">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span>ou</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
           <div className="w-full">
-            <label className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-green-500 rounded-xl bg-green-50 cursor-pointer hover:bg-green-100 hover:border-green-600 transition-all">
-              <div className="text-5xl mb-4">📷</div>
-              <span className="text-lg font-medium text-green-800 mb-1">
+            <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-green-500 rounded-xl bg-green-50 cursor-pointer hover:bg-green-100 hover:border-green-600 transition-all">
+              <div className="text-4xl mb-3">📷</div>
+              <span className="text-base font-medium text-green-800 mb-1">
                 {carregandoImagem
                   ? "Processando..."
-                  : "Clique para enviar foto do QR code"}
+                  : "Enviar foto do QR code"}
               </span>
               <span className="text-sm text-gray-500">
                 ou arraste a imagem aqui
