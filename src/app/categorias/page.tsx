@@ -1,9 +1,5 @@
-import { Categorias } from "@/components/Categorias";
+import { redirect } from "next/navigation";
 
 export default function CategoriasPage() {
-  return (
-    <main className="min-h-screen py-8 bg-gray-50">
-      <Categorias />
-    </main>
-  );
+  redirect("/configuracoes");
 }

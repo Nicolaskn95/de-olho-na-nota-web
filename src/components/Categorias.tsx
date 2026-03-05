@@ -19,7 +19,12 @@ interface Prefixo {
   categoria: Categoria;
 }
 
-export function Categorias() {
+interface CategoriasProps {
+  /** Quando true, oculta o título principal (uso dentro de Configurações) */
+  compact?: boolean;
+}
+
+export function Categorias({ compact }: CategoriasProps) {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
   const [novoPrefixo, setNovoPrefixo] = useState("");
@@ -202,15 +207,17 @@ export function Categorias() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <header className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-green-800 mb-2">
-          Categorização de Produtos
-        </h1>
-        <p className="text-gray-600">
-          Cadastre prefixos para categorizar produtos automaticamente
-        </p>
-      </header>
+    <div className={compact ? "" : "max-w-4xl mx-auto p-6"}>
+      {!compact && (
+        <header className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-green-800 mb-2">
+            Categorização de Produtos
+          </h1>
+          <p className="text-gray-600">
+            Cadastre prefixos para categorizar produtos automaticamente
+          </p>
+        </header>
+      )}
 
       {erro && (
         <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4">

@@ -32,10 +32,10 @@ export default function RootLayout({
               Notas Fiscais
             </Link>
             <Link
-              href="/categorias"
+              href="/configuracoes"
               className="hover:text-green-200 transition-colors"
             >
-              Categorias
+              Configurações
             </Link>
             <Link
               href="/financeiro"
