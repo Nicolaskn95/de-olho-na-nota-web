@@ -1,91 +1,91 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface EstabelecimentoItem {
-  cnpj: string;
-  estabelecimento: string;
-  totalNotas: number;
+  cnpj: string
+  estabelecimento: string
+  totalNotas: number
 }
 
 export function Estabelecimentos() {
-  const [lista, setLista] = useState<EstabelecimentoItem[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
-  const [sucesso, setSucesso] = useState<string | null>(null);
-  const [editando, setEditando] = useState<EstabelecimentoItem | null>(null);
-  const [nomeEditado, setNomeEditado] = useState("");
-  const [salvando, setSalvando] = useState(false);
+  const [lista, setLista] = useState<EstabelecimentoItem[]>([])
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
+  const [sucesso, setSucesso] = useState<string | null>(null)
+  const [editando, setEditando] = useState<EstabelecimentoItem | null>(null)
+  const [nomeEditado, setNomeEditado] = useState('')
+  const [salvando, setSalvando] = useState(false)
 
   const carregar = async () => {
-    setCarregando(true);
-    setErro(null);
+    setCarregando(true)
+    setErro(null)
     try {
-      const res = await fetch(`${API_URL}/notas-fiscais/estabelecimentos`);
-      if (!res.ok) throw new Error("Erro ao carregar estabelecimentos");
-      const data = await res.json();
-      setLista(data);
+      const res = await fetch(`${API_URL}/notas-fiscais/estabelecimentos`)
+      if (!res.ok) throw new Error('Erro ao carregar estabelecimentos')
+      const data = await res.json()
+      setLista(data)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro desconhecido");
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
-      setCarregando(false);
+      setCarregando(false)
     }
-  };
+  }
 
   useEffect(() => {
-    carregar();
-  }, []);
+    carregar()
+  }, [])
 
   const abrirEdicao = (item: EstabelecimentoItem) => {
-    setEditando(item);
-    setNomeEditado(item.estabelecimento);
-    setErro(null);
-    setSucesso(null);
-  };
+    setEditando(item)
+    setNomeEditado(item.estabelecimento)
+    setErro(null)
+    setSucesso(null)
+  }
 
   const fecharEdicao = () => {
-    setEditando(null);
-    setNomeEditado("");
-  };
+    setEditando(null)
+    setNomeEditado('')
+  }
 
   const salvarNome = async () => {
-    if (!editando || !nomeEditado.trim()) return;
-    setSalvando(true);
-    setErro(null);
+    if (!editando || !nomeEditado.trim()) return
+    setSalvando(true)
+    setErro(null)
     try {
-      const cnpjEncoded = encodeURIComponent(editando.cnpj);
+      const cnpjEncoded = encodeURIComponent(editando.cnpj)
       const res = await fetch(
         `${API_URL}/notas-fiscais/estabelecimentos/${cnpjEncoded}`,
         {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ estabelecimento: nomeEditado.trim() }),
-        }
-      );
+        },
+      )
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || `Erro ${res.status}`);
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || `Erro ${res.status}`)
       }
-      const result = await res.json();
+      const result = await res.json()
       setLista((prev) =>
         prev.map((e) =>
           e.cnpj === editando.cnpj
             ? { ...e, estabelecimento: result.estabelecimento }
-            : e
-        )
-      );
+            : e,
+        ),
+      )
       setSucesso(
-        `Nome atualizado. ${result.notasAtualizadas} nota(s) atualizada(s).`
-      );
-      fecharEdicao();
+        `Nome atualizado. ${result.notasAtualizadas} nota(s) atualizada(s).`,
+      )
+      fecharEdicao()
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao salvar");
+      setErro(e instanceof Error ? e.message : 'Erro ao salvar')
     } finally {
-      setSalvando(false);
+      setSalvando(false)
     }
-  };
+  }
 
   if (carregando) {
     return (
@@ -93,7 +93,7 @@ export function Estabelecimentos() {
         <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4" />
         <p className="text-gray-600">Carregando estabelecimentos...</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -158,7 +158,7 @@ export function Estabelecimentos() {
                 disabled={!nomeEditado.trim() || salvando}
                 className="px-4 py-2 bg-green-800 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {salvando ? "Salvando..." : "Salvar"}
+                {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>
@@ -180,7 +180,7 @@ export function Estabelecimentos() {
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-sm text-gray-500">{item.cnpj}</p>
                 <p className="font-medium text-gray-800 truncate">
-                  {item.estabelecimento || "—"}
+                  {item.estabelecimento || '—'}
                 </p>
                 <p className="text-xs text-gray-400">
                   {item.totalNotas} nota(s)
@@ -197,5 +197,5 @@ export function Estabelecimentos() {
         </ul>
       )}
     </div>
-  );
+  )
 }

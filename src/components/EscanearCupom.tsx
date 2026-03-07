@@ -1,108 +1,108 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { Scanner } from "@yudiel/react-qr-scanner";
-import { Html5Qrcode } from "html5-qrcode";
+import { useState } from 'react'
+import { Scanner } from '@yudiel/react-qr-scanner'
+import { Html5Qrcode } from 'html5-qrcode'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface NotaFiscalResponse {
-  _id: string;
-  chaveAcesso: string;
-  numero: string;
-  estabelecimento: string;
-  valorTotal: number;
-  valorPago: number;
+  _id: string
+  chaveAcesso: string
+  numero: string
+  estabelecimento: string
+  valorTotal: number
+  valorPago: number
   produtos: Array<{
-    nome: string;
-    quantidade: number;
-    unidade: string;
-    valorUnitario: number;
-    valorTotal: number;
-  }>;
+    nome: string
+    quantidade: number
+    unidade: string
+    valorUnitario: number
+    valorTotal: number
+  }>
 }
 
 export function EscanearCupom() {
-  const [conteudoLido, setConteudoLido] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-  const [urlManual, setUrlManual] = useState("");
-  const [modoManual, setModoManual] = useState(false);
-  const [carregandoImagem, setCarregandoImagem] = useState(false);
-  const [processando, setProcessando] = useState(false);
+  const [conteudoLido, setConteudoLido] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [urlManual, setUrlManual] = useState('')
+  const [modoManual, setModoManual] = useState(false)
+  const [carregandoImagem, setCarregandoImagem] = useState(false)
+  const [processando, setProcessando] = useState(false)
   const [notaProcessada, setNotaProcessada] =
-    useState<NotaFiscalResponse | null>(null);
+    useState<NotaFiscalResponse | null>(null)
 
   const recomecar = () => {
-    setConteudoLido(null);
-    setErro(null);
-    setNotaProcessada(null);
-    setModoManual(false);
-    setUrlManual("");
-  };
+    setConteudoLido(null)
+    setErro(null)
+    setNotaProcessada(null)
+    setModoManual(false)
+    setUrlManual('')
+  }
 
   const enviarParaProcessar = async () => {
-    if (!conteudoLido) return;
+    if (!conteudoLido) return
 
-    setProcessando(true);
-    setErro(null);
-    console.log(API_URL);
+    setProcessando(true)
+    setErro(null)
+    console.log(API_URL)
     try {
       const response = await fetch(`${API_URL}/notas-fiscais/processar`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url: conteudoLido }),
-      });
+      })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Erro ${response.status}`);
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
-      const nota: NotaFiscalResponse = await response.json();
-      setNotaProcessada(nota);
+      const nota: NotaFiscalResponse = await response.json()
+      setNotaProcessada(nota)
     } catch (e) {
-      console.error("Erro ao processar nota:", e);
-      setErro(e instanceof Error ? e.message : "Erro ao processar nota fiscal");
+      console.error('Erro ao processar nota:', e)
+      setErro(e instanceof Error ? e.message : 'Erro ao processar nota fiscal')
     } finally {
-      setProcessando(false);
+      setProcessando(false)
     }
-  };
+  }
 
   const enviarUrlManual = () => {
-    const url = urlManual.trim();
+    const url = urlManual.trim()
     if (url) {
-      setConteudoLido(url);
-      setModoManual(false);
-      setErro(null);
+      setConteudoLido(url)
+      setModoManual(false)
+      setErro(null)
     }
-  };
+  }
 
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const file = event.target.files?.[0]
+    if (!file) return
 
-    setCarregandoImagem(true);
-    setErro(null);
+    setCarregandoImagem(true)
+    setErro(null)
 
     try {
-      const scanner = new Html5Qrcode("qr-reader-hidden", { verbose: false });
-      const result = await scanner.scanFileV2(file, true);
-      setConteudoLido(result.decodedText);
-      setErro(null);
+      const scanner = new Html5Qrcode('qr-reader-hidden', { verbose: false })
+      const result = await scanner.scanFileV2(file, true)
+      setConteudoLido(result.decodedText)
+      setErro(null)
     } catch (e) {
-      console.error("Erro ao ler imagem:", e);
+      console.error('Erro ao ler imagem:', e)
       setErro(
-        "Não foi possível ler o QR code da imagem. Tente uma foto com melhor qualidade ou use a opção manual.",
-      );
+        'Não foi possível ler o QR code da imagem. Tente uma foto com melhor qualidade ou use a opção manual.',
+      )
     } finally {
-      setCarregandoImagem(false);
-      event.target.value = "";
+      setCarregandoImagem(false)
+      event.target.value = ''
     }
-  };
+  }
 
   return (
     <div className="max-w-lg mx-auto p-6">
@@ -138,26 +138,26 @@ export function EscanearCupom() {
           <div className="w-full rounded-xl overflow-hidden border border-green-500 bg-black">
             <Scanner
               onScan={(detectedCodes) => {
-                if (!detectedCodes || detectedCodes.length === 0) return;
-                const value = detectedCodes[0]?.rawValue;
-                if (!value) return;
-                setConteudoLido(value);
-                setErro(null);
+                if (!detectedCodes || detectedCodes.length === 0) return
+                const value = detectedCodes[0]?.rawValue
+                if (!value) return
+                setConteudoLido(value)
+                setErro(null)
               }}
               onError={(error) => {
-                console.error("Erro no scanner:", error);
+                console.error('Erro no scanner:', error)
               }}
               constraints={{
-                facingMode: "environment",
+                facingMode: 'environment',
               }}
               paused={!!conteudoLido}
               styles={{
                 container: {
-                  width: "100%",
+                  width: '100%',
                 },
                 video: {
-                  width: "100%",
-                  objectFit: "cover",
+                  width: '100%',
+                  objectFit: 'cover',
                 },
               }}
             />
@@ -173,9 +173,7 @@ export function EscanearCupom() {
             <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-green-500 rounded-xl bg-green-50 cursor-pointer hover:bg-green-100 hover:border-green-600 transition-all">
               <div className="text-4xl mb-3">📷</div>
               <span className="text-base font-medium text-green-800 mb-1">
-                {carregandoImagem
-                  ? "Processando..."
-                  : "Enviar foto do QR code"}
+                {carregandoImagem ? 'Processando...' : 'Enviar foto do QR code'}
               </span>
               <span className="text-sm text-gray-500">
                 ou arraste a imagem aqui
@@ -271,7 +269,7 @@ export function EscanearCupom() {
               onClick={enviarParaProcessar}
               disabled={processando}
             >
-              {processando ? "Processando..." : "Processar nota"}
+              {processando ? 'Processando...' : 'Processar nota'}
             </button>
           </div>
         </section>
@@ -284,19 +282,19 @@ export function EscanearCupom() {
           </h2>
           <div className="grid gap-2 mb-6">
             <p className="text-sm">
-              <strong className="text-gray-700">Estabelecimento:</strong>{" "}
+              <strong className="text-gray-700">Estabelecimento:</strong>{' '}
               {notaProcessada.estabelecimento}
             </p>
             <p className="text-sm">
-              <strong className="text-gray-700">Número:</strong>{" "}
+              <strong className="text-gray-700">Número:</strong>{' '}
               {notaProcessada.numero}
             </p>
             <p className="text-sm">
-              <strong className="text-gray-700">Valor Total:</strong> R${" "}
+              <strong className="text-gray-700">Valor Total:</strong> R${' '}
               {notaProcessada.valorTotal.toFixed(2)}
             </p>
             <p className="text-sm">
-              <strong className="text-gray-700">Valor Pago:</strong> R${" "}
+              <strong className="text-gray-700">Valor Pago:</strong> R${' '}
               {notaProcessada.valorPago.toFixed(2)}
             </p>
           </div>
@@ -335,5 +333,5 @@ export function EscanearCupom() {
         </section>
       )}
     </div>
-  );
+  )
 }

@@ -1,153 +1,164 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface Produto {
-  nome: string;
-  quantidade: number;
-  unidade: string;
-  valorUnitario: number;
-  valorTotal: number;
+  nome: string
+  quantidade: number
+  unidade: string
+  valorUnitario: number
+  valorTotal: number
 }
 
 interface NotaFiscal {
-  _id: string;
-  chaveAcesso: string;
-  numero: string;
-  dataEmissao: string;
-  estabelecimento: string;
-  valorTotal: number;
-  valorPago: number;
-  produtos: Produto[];
+  _id: string
+  chaveAcesso: string
+  numero: string
+  dataEmissao: string
+  estabelecimento: string
+  valorTotal: number
+  valorPago: number
+  produtos: Produto[]
 }
 
 interface GastosMensais {
-  mes: string;
-  mesNumero: number;
-  ano: number;
-  total: number;
-  notas: NotaFiscal[];
+  mes: string
+  mesNumero: number
+  ano: number
+  total: number
+  notas: NotaFiscal[]
 }
 
 interface Categoria {
-  _id: string;
-  codigo: string;
-  nome: string;
-  descricao: string;
-  icone: string;
-  cor: string;
+  _id: string
+  codigo: string
+  nome: string
+  descricao: string
+  icone: string
+  cor: string
 }
 
 interface Prefixo {
-  _id: string;
-  prefixo: string;
-  categoria: Categoria;
+  _id: string
+  prefixo: string
+  categoria: Categoria
 }
 
 export function NotasFiscais() {
-  const [notas, setNotas] = useState<NotaFiscal[]>([]);
-  const [gastosPorMes, setGastosPorMes] = useState<GastosMensais[]>([]);
+  const [notas, setNotas] = useState<NotaFiscal[]>([])
+  const [gastosPorMes, setGastosPorMes] = useState<GastosMensais[]>([])
   const [mesSelecionado, setMesSelecionado] = useState<GastosMensais | null>(
     null,
-  );
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
-  const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
+  )
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
+  const [prefixos, setPrefixos] = useState<Prefixo[]>([])
 
   useEffect(() => {
-    carregarDados();
-  }, []);
+    carregarDados()
+  }, [])
 
   const carregarDados = async () => {
     try {
       const [notasRes, prefixosRes] = await Promise.all([
         fetch(`${API_URL}/notas-fiscais`),
         fetch(`${API_URL}/categorias/prefixos/listar`),
-      ]);
+      ])
 
       if (!notasRes.ok) {
-        throw new Error("Erro ao carregar notas fiscais");
+        throw new Error('Erro ao carregar notas fiscais')
       }
 
-      const notasData: NotaFiscal[] = await notasRes.json();
-      const prefixosData: Prefixo[] = prefixosRes.ok ? await prefixosRes.json() : [];
+      const notasData: NotaFiscal[] = await notasRes.json()
+      const prefixosData: Prefixo[] = prefixosRes.ok
+        ? await prefixosRes.json()
+        : []
 
-      setNotas(notasData);
-      setPrefixos(prefixosData);
-      calcularGastosPorMes(notasData);
+      setNotas(notasData)
+      setPrefixos(prefixosData)
+      calcularGastosPorMes(notasData)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro desconhecido");
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
-      setCarregando(false);
+      setCarregando(false)
     }
-  };
+  }
 
-  const extrairNomeProduto = (nomeCompleto: string): { nomePrincipal: string; nomeSecundario: string | null } => {
-    const partes = nomeCompleto.split(/\s+/);
-    const indicePHIG = partes.findIndex((parte) => parte.toUpperCase() === "P" && partes[partes.indexOf(parte) + 1]?.toUpperCase().startsWith("HIG"));
-    
+  const extrairNomeProduto = (
+    nomeCompleto: string,
+  ): { nomePrincipal: string; nomeSecundario: string | null } => {
+    const partes = nomeCompleto.split(/\s+/)
+    const indicePHIG = partes.findIndex(
+      (parte) =>
+        parte.toUpperCase() === 'P' &&
+        partes[partes.indexOf(parte) + 1]?.toUpperCase().startsWith('HIG'),
+    )
+
     if (indicePHIG !== -1) {
-      const nomePrincipal = partes.slice(0, indicePHIG).join(" ");
-      const nomeSecundario = partes.slice(indicePHIG).join(" ");
-      return { nomePrincipal, nomeSecundario };
+      const nomePrincipal = partes.slice(0, indicePHIG).join(' ')
+      const nomeSecundario = partes.slice(indicePHIG).join(' ')
+      return { nomePrincipal, nomeSecundario }
     }
 
-    const indiceP = partes.findIndex((parte, idx) => 
-      parte.toUpperCase() === "P" && idx > 0 && partes.length > idx + 1
-    );
-    
+    const indiceP = partes.findIndex(
+      (parte, idx) =>
+        parte.toUpperCase() === 'P' && idx > 0 && partes.length > idx + 1,
+    )
+
     if (indiceP !== -1 && indiceP > 0) {
-      const segundaParte = partes.slice(indiceP).join(" ");
+      const segundaParte = partes.slice(indiceP).join(' ')
       if (segundaParte.length >= 3) {
         return {
-          nomePrincipal: partes.slice(0, indiceP).join(" "),
+          nomePrincipal: partes.slice(0, indiceP).join(' '),
           nomeSecundario: segundaParte,
-        };
+        }
       }
     }
 
-    return { nomePrincipal: nomeCompleto, nomeSecundario: null };
-  };
+    return { nomePrincipal: nomeCompleto, nomeSecundario: null }
+  }
 
   const obterCategoriaProduto = (nomeProduto: string): Categoria | null => {
-    const nomeUpper = nomeProduto.toUpperCase();
-    
-    const prefixosOrdenados = [...prefixos].sort((a, b) => b.prefixo.length - a.prefixo.length);
-    
+    const nomeUpper = nomeProduto.toUpperCase()
+
+    const prefixosOrdenados = [...prefixos].sort(
+      (a, b) => b.prefixo.length - a.prefixo.length,
+    )
+
     for (const prefixo of prefixosOrdenados) {
       if (nomeUpper.startsWith(prefixo.prefixo.toUpperCase())) {
-        return prefixo.categoria;
+        return prefixo.categoria
       }
     }
-    
-    return null;
-  };
+
+    return null
+  }
 
   const calcularGastosPorMes = (notas: NotaFiscal[]) => {
-    const gastosMapa = new Map<string, GastosMensais>();
+    const gastosMapa = new Map<string, GastosMensais>()
 
     const mesesNomes = [
-      "Janeiro",
-      "Fevereiro",
-      "Março",
-      "Abril",
-      "Maio",
-      "Junho",
-      "Julho",
-      "Agosto",
-      "Setembro",
-      "Outubro",
-      "Novembro",
-      "Dezembro",
-    ];
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ]
 
     for (const nota of notas) {
-      const data = new Date(nota.dataEmissao);
-      const mes = data.getMonth();
-      const ano = data.getFullYear();
-      const chave = `${ano}-${mes}`;
+      const data = new Date(nota.dataEmissao)
+      const mes = data.getMonth()
+      const ano = data.getFullYear()
+      const chave = `${ano}-${mes}`
 
       if (!gastosMapa.has(chave)) {
         gastosMapa.set(chave, {
@@ -156,37 +167,37 @@ export function NotasFiscais() {
           ano,
           total: 0,
           notas: [],
-        });
+        })
       }
 
-      const gastos = gastosMapa.get(chave)!;
-      gastos.total += nota.valorPago;
-      gastos.notas.push(nota);
+      const gastos = gastosMapa.get(chave)!
+      gastos.total += nota.valorPago
+      gastos.notas.push(nota)
     }
 
     const gastosOrdenados = Array.from(gastosMapa.values()).sort((a, b) => {
-      if (a.ano !== b.ano) return b.ano - a.ano;
-      return b.mesNumero - a.mesNumero;
-    });
+      if (a.ano !== b.ano) return b.ano - a.ano
+      return b.mesNumero - a.mesNumero
+    })
 
-    setGastosPorMes(gastosOrdenados);
+    setGastosPorMes(gastosOrdenados)
 
     if (gastosOrdenados.length > 0 && !mesSelecionado) {
-      setMesSelecionado(gastosOrdenados[0]);
+      setMesSelecionado(gastosOrdenados[0])
     }
-  };
+  }
 
   const formatarMoeda = (valor: number) => {
-    return valor.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
-  };
+    return valor.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+  }
 
   const formatarData = (dataStr: string) => {
-    const data = new Date(dataStr);
-    return data.toLocaleDateString("pt-BR");
-  };
+    const data = new Date(dataStr)
+    return data.toLocaleDateString('pt-BR')
+  }
 
   if (carregando) {
     return (
@@ -196,7 +207,7 @@ export function NotasFiscais() {
           <p className="text-gray-600">Carregando notas fiscais...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (erro) {
@@ -212,7 +223,7 @@ export function NotasFiscais() {
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   if (notas.length === 0) {
@@ -227,15 +238,17 @@ export function NotasFiscais() {
           <p className="text-sm">Escaneie um cupom fiscal para começar</p>
         </div>
       </div>
-    );
+    )
   }
 
-  const totalGeral = notas.reduce((acc, nota) => acc + nota.valorPago, 0);
+  const totalGeral = notas.reduce((acc, nota) => acc + nota.valorPago, 0)
 
   return (
     <div className="max-w-4xl mx-auto p-6">
       <header className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-green-800 mb-2">Notas Fiscais</h1>
+        <h1 className="text-3xl font-bold text-green-800 mb-2">
+          Notas Fiscais
+        </h1>
         <p className="text-gray-600">Acompanhe seus gastos mensais</p>
       </header>
 
@@ -271,8 +284,8 @@ export function NotasFiscais() {
                 className={`w-full p-4 rounded-lg text-left transition-all ${
                   mesSelecionado?.ano === gastos.ano &&
                   mesSelecionado?.mesNumero === gastos.mesNumero
-                    ? "bg-green-100 border-2 border-green-500"
-                    : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                    ? 'bg-green-100 border-2 border-green-500'
+                    : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                 }`}
               >
                 <div className="flex justify-between items-center">
@@ -282,7 +295,7 @@ export function NotasFiscais() {
                     </p>
                     <p className="text-sm text-gray-500">
                       {gastos.notas.length} nota
-                      {gastos.notas.length !== 1 ? "s" : ""}
+                      {gastos.notas.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                   <p className="font-semibold text-green-700">
@@ -324,13 +337,16 @@ export function NotasFiscais() {
                       <details className="mt-2">
                         <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-800">
                           Ver {nota.produtos.length} produto
-                          {nota.produtos.length !== 1 ? "s" : ""}
+                          {nota.produtos.length !== 1 ? 's' : ''}
                         </summary>
                         <ul className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200">
                           {nota.produtos.map((produto, idx) => {
-                            const { nomePrincipal, nomeSecundario } = extrairNomeProduto(produto.nome);
-                            const categoria = obterCategoriaProduto(produto.nome);
-                            
+                            const { nomePrincipal, nomeSecundario } =
+                              extrairNomeProduto(produto.nome)
+                            const categoria = obterCategoriaProduto(
+                              produto.nome,
+                            )
+
                             return (
                               <li
                                 key={idx}
@@ -338,7 +354,7 @@ export function NotasFiscais() {
                               >
                                 <div className="flex-1">
                                   <span className="text-gray-600">
-                                    {produto.quantidade} {produto.unidade} -{" "}
+                                    {produto.quantidade} {produto.unidade} -{' '}
                                     {nomePrincipal}
                                     {nomeSecundario && (
                                       <span className="text-gray-400 text-xs ml-1">
@@ -351,18 +367,18 @@ export function NotasFiscais() {
                                   <span
                                     className={`text-xs px-2 py-0.5 rounded-full ${
                                       categoria
-                                        ? "bg-green-100 text-green-700"
-                                        : "bg-gray-100 text-gray-500"
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-gray-100 text-gray-500'
                                     }`}
                                   >
-                                    {categoria?.nome || "Outros"}
+                                    {categoria?.nome || 'Outros'}
                                   </span>
                                   <span className="text-gray-800 font-medium whitespace-nowrap">
                                     {formatarMoeda(produto.valorTotal)}
                                   </span>
                                 </div>
                               </li>
-                            );
+                            )
                           })}
                         </ul>
                       </details>
@@ -375,5 +391,5 @@ export function NotasFiscais() {
         </div>
       </div>
     </div>
-  );
+  )
 }

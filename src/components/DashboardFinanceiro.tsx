@@ -1,6 +1,6 @@
-"use client";
+'use client'
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from 'react'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -9,8 +9,8 @@ import {
   Title,
   Tooltip,
   Legend,
-} from "chart.js";
-import { Bar } from "react-chartjs-2";
+} from 'chart.js'
+import { Bar } from 'react-chartjs-2'
 import {
   Beef,
   Apple,
@@ -27,45 +27,38 @@ import {
   TrendingUp,
   TrendingDown,
   Calendar,
-} from "lucide-react";
+} from 'lucide-react'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
 interface Produto {
-  nome: string;
-  quantidade: number;
-  unidade: string;
-  valorUnitario: number;
-  valorTotal: number;
+  nome: string
+  quantidade: number
+  unidade: string
+  valorUnitario: number
+  valorTotal: number
 }
 
 interface NotaFiscal {
-  _id: string;
-  dataEmissao: string;
-  valorPago: number;
-  produtos: Produto[];
+  _id: string
+  dataEmissao: string
+  valorPago: number
+  produtos: Produto[]
 }
 
 interface Categoria {
-  _id: string;
-  codigo: string;
-  nome: string;
-  cor: string;
-  icone: string;
+  _id: string
+  codigo: string
+  nome: string
+  cor: string
+  icone: string
 }
 
 interface Prefixo {
-  prefixo: string;
-  categoria: Categoria;
+  prefixo: string
+  categoria: Categoria
 }
 
 const ICONE_MAP: Record<string, React.ElementType> = {
@@ -81,68 +74,72 @@ const ICONE_MAP: Record<string, React.ElementType> = {
   PawPrint,
   Lamp,
   ShoppingCart,
-};
+}
 
 const CATEGORIA_CONFIG: Record<
   string,
   { label: string; color: string; icon: React.ElementType }
 > = {
-  ACOUGUE_E_PEIXARIA: { label: "Açougue", color: "#dc2626", icon: Beef },
-  HORTIFRUTI: { label: "Hortifruti", color: "#16a34a", icon: Apple },
-  LATICINIOS_E_OVOS: { label: "Laticínios", color: "#f59e0b", icon: Milk },
-  PADARIA_E_CONFEITARIA: { label: "Padaria", color: "#d97706", icon: Croissant },
-  MERCEARIA_SECA: { label: "Mercearia", color: "#8b5cf6", icon: Package },
-  CONGELADOS: { label: "Congelados", color: "#0ea5e9", icon: Snowflake },
-  BEBIDAS: { label: "Bebidas", color: "#ec4899", icon: Wine },
-  LIMPEZA: { label: "Limpeza", color: "#06b6d4", icon: SprayCan },
-  HIGIENE_E_BELEZA: { label: "Higiene", color: "#f472b6", icon: Sparkles },
-  PET_SHOP: { label: "Pet Shop", color: "#a855f7", icon: PawPrint },
-  UTILIDADES_DOMESTICAS: { label: "Utilidades", color: "#64748b", icon: Lamp },
-  OUTROS: { label: "Outros", color: "#9ca3af", icon: ShoppingCart },
-};
+  ACOUGUE_E_PEIXARIA: { label: 'Açougue', color: '#dc2626', icon: Beef },
+  HORTIFRUTI: { label: 'Hortifruti', color: '#16a34a', icon: Apple },
+  LATICINIOS_E_OVOS: { label: 'Laticínios', color: '#f59e0b', icon: Milk },
+  PADARIA_E_CONFEITARIA: {
+    label: 'Padaria',
+    color: '#d97706',
+    icon: Croissant,
+  },
+  MERCEARIA_SECA: { label: 'Mercearia', color: '#8b5cf6', icon: Package },
+  CONGELADOS: { label: 'Congelados', color: '#0ea5e9', icon: Snowflake },
+  BEBIDAS: { label: 'Bebidas', color: '#ec4899', icon: Wine },
+  LIMPEZA: { label: 'Limpeza', color: '#06b6d4', icon: SprayCan },
+  HIGIENE_E_BELEZA: { label: 'Higiene', color: '#f472b6', icon: Sparkles },
+  PET_SHOP: { label: 'Pet Shop', color: '#a855f7', icon: PawPrint },
+  UTILIDADES_DOMESTICAS: { label: 'Utilidades', color: '#64748b', icon: Lamp },
+  OUTROS: { label: 'Outros', color: '#9ca3af', icon: ShoppingCart },
+}
 
 function getWeekOfMonth(date: Date): number {
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
-  const dayOfMonth = date.getDate();
-  const firstDayOfWeek = firstDay.getDay();
-  return Math.ceil((dayOfMonth + firstDayOfWeek) / 7);
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
+  const dayOfMonth = date.getDate()
+  const firstDayOfWeek = firstDay.getDay()
+  return Math.ceil((dayOfMonth + firstDayOfWeek) / 7)
 }
 
 function categorizarProduto(
   nomeProduto: string,
-  prefixos: Prefixo[]
+  prefixos: Prefixo[],
 ): { categoriaId: string; categoriaCodigo: string } | null {
-  const nomeUpper = nomeProduto.toUpperCase();
-  
+  const nomeUpper = nomeProduto.toUpperCase()
+
   const prefixosOrdenados = [...prefixos].sort(
-    (a, b) => b.prefixo.length - a.prefixo.length
-  );
-  
+    (a, b) => b.prefixo.length - a.prefixo.length,
+  )
+
   for (const p of prefixosOrdenados) {
     if (nomeUpper.startsWith(p.prefixo) && p.categoria) {
       return {
         categoriaId: p.categoria._id,
         categoriaCodigo: p.categoria.codigo,
-      };
+      }
     }
   }
-  return null;
+  return null
 }
 
 export function DashboardFinanceiro() {
-  const [notas, setNotas] = useState<NotaFiscal[]>([]);
-  const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [notas, setNotas] = useState<NotaFiscal[]>([])
+  const [prefixos, setPrefixos] = useState<Prefixo[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [mesSelecionado, setMesSelecionado] = useState(() => {
-    const hoje = new Date();
-    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
+    const hoje = new Date()
+    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
-    carregarDados();
-  }, []);
+    carregarDados()
+  }, [])
 
   const carregarDados = async () => {
     try {
@@ -150,57 +147,57 @@ export function DashboardFinanceiro() {
         fetch(`${API_URL}/notas-fiscais`),
         fetch(`${API_URL}/categorias/prefixos/listar`),
         fetch(`${API_URL}/categorias`),
-      ]);
+      ])
 
       if (!notasRes.ok || !prefixosRes.ok || !categoriasRes.ok) {
-        throw new Error("Erro ao carregar dados");
+        throw new Error('Erro ao carregar dados')
       }
 
-      const notasData = await notasRes.json();
-      const prefixosData = await prefixosRes.json();
-      const categoriasData = await categoriasRes.json();
+      const notasData = await notasRes.json()
+      const prefixosData = await prefixosRes.json()
+      const categoriasData = await categoriasRes.json()
 
-      setNotas(notasData);
-      setPrefixos(prefixosData);
-      setCategorias(categoriasData);
-      
+      setNotas(notasData)
+      setPrefixos(prefixosData)
+      setCategorias(categoriasData)
+
       // Selecionar automaticamente o mês mais recente com notas
       if (notasData.length > 0) {
-        const mesesComNotas = new Set<string>();
+        const mesesComNotas = new Set<string>()
         notasData.forEach((nota: NotaFiscal) => {
-          const data = new Date(nota.dataEmissao);
-          const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
-          mesesComNotas.add(mesAno);
-        });
-        const mesesOrdenados = Array.from(mesesComNotas).sort().reverse();
+          const data = new Date(nota.dataEmissao)
+          const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
+          mesesComNotas.add(mesAno)
+        })
+        const mesesOrdenados = Array.from(mesesComNotas).sort().reverse()
         if (mesesOrdenados.length > 0) {
-          setMesSelecionado(mesesOrdenados[0]);
+          setMesSelecionado(mesesOrdenados[0])
         }
       }
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro desconhecido");
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
-      setCarregando(false);
+      setCarregando(false)
     }
-  };
+  }
 
   const mesesDisponiveis = useMemo(() => {
-    const meses = new Set<string>();
+    const meses = new Set<string>()
     notas.forEach((nota) => {
-      const data = new Date(nota.dataEmissao);
-      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
-      meses.add(mesAno);
-    });
-    return Array.from(meses).sort().reverse();
-  }, [notas]);
+      const data = new Date(nota.dataEmissao)
+      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
+      meses.add(mesAno)
+    })
+    return Array.from(meses).sort().reverse()
+  }, [notas])
 
   const dadosPorSemana = useMemo(() => {
-    const [ano, mes] = mesSelecionado.split("-").map(Number);
+    const [ano, mes] = mesSelecionado.split('-').map(Number)
 
     const notasDoMes = notas.filter((nota) => {
-      const data = new Date(nota.dataEmissao);
-      return data.getFullYear() === ano && data.getMonth() === mes - 1;
-    });
+      const data = new Date(nota.dataEmissao)
+      return data.getFullYear() === ano && data.getMonth() === mes - 1
+    })
 
     const semanas: Record<number, Record<string, number>> = {
       1: {},
@@ -208,48 +205,48 @@ export function DashboardFinanceiro() {
       3: {},
       4: {},
       5: {},
-    };
+    }
 
     notasDoMes.forEach((nota) => {
-      const data = new Date(nota.dataEmissao);
-      const semana = getWeekOfMonth(data);
+      const data = new Date(nota.dataEmissao)
+      const semana = getWeekOfMonth(data)
 
       if (nota.produtos && Array.isArray(nota.produtos)) {
         nota.produtos.forEach((produto) => {
-          const resultado = categorizarProduto(produto.nome, prefixos);
-          const categoriaCodigo = resultado?.categoriaCodigo || "OUTROS";
-          if (!semanas[semana]) semanas[semana] = {};
+          const resultado = categorizarProduto(produto.nome, prefixos)
+          const categoriaCodigo = resultado?.categoriaCodigo || 'OUTROS'
+          if (!semanas[semana]) semanas[semana] = {}
           semanas[semana][categoriaCodigo] =
-            (semanas[semana][categoriaCodigo] || 0) + produto.valorTotal;
-        });
+            (semanas[semana][categoriaCodigo] || 0) + produto.valorTotal
+        })
       }
-    });
+    })
 
-    return semanas;
-  }, [notas, prefixos, mesSelecionado]);
+    return semanas
+  }, [notas, prefixos, mesSelecionado])
 
   const categoriasAtivas = useMemo(() => {
-    const cats = new Set<string>();
+    const cats = new Set<string>()
     Object.values(dadosPorSemana).forEach((semana) => {
-      Object.keys(semana).forEach((cat) => cats.add(cat));
-    });
-    return Array.from(cats);
-  }, [dadosPorSemana]);
+      Object.keys(semana).forEach((cat) => cats.add(cat))
+    })
+    return Array.from(cats)
+  }, [dadosPorSemana])
 
   const chartData = useMemo(() => {
-    const labels = ["Semana 1", "Semana 2", "Semana 3", "Semana 4", "Semana 5"];
+    const labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Semana 5']
 
     const datasets = categoriasAtivas.map((categoria) => ({
       label: CATEGORIA_CONFIG[categoria]?.label || categoria,
       data: [1, 2, 3, 4, 5].map(
-        (semana) => dadosPorSemana[semana]?.[categoria] || 0
+        (semana) => dadosPorSemana[semana]?.[categoria] || 0,
       ),
-      backgroundColor: CATEGORIA_CONFIG[categoria]?.color || "#9ca3af",
+      backgroundColor: CATEGORIA_CONFIG[categoria]?.color || '#9ca3af',
       borderRadius: 4,
-    }));
+    }))
 
-    return { labels, datasets };
-  }, [dadosPorSemana, categoriasAtivas]);
+    return { labels, datasets }
+  }, [dadosPorSemana, categoriasAtivas])
 
   const chartOptions = {
     responsive: true,
@@ -261,8 +258,8 @@ export function DashboardFinanceiro() {
       tooltip: {
         callbacks: {
           label: (context: { dataset: { label?: string }; raw: unknown }) => {
-            const value = context.raw as number;
-            return `${context.dataset.label || ""}: R$ ${value.toFixed(2)}`;
+            const value = context.raw as number
+            return `${context.dataset.label || ''}: R$ ${value.toFixed(2)}`
           },
         },
       },
@@ -281,48 +278,46 @@ export function DashboardFinanceiro() {
         },
       },
     },
-  };
+  }
 
   const totalMes = useMemo(() => {
     return Object.values(dadosPorSemana).reduce((total, semana) => {
-      return (
-        total + Object.values(semana).reduce((sum, val) => sum + val, 0)
-      );
-    }, 0);
-  }, [dadosPorSemana]);
+      return total + Object.values(semana).reduce((sum, val) => sum + val, 0)
+    }, 0)
+  }, [dadosPorSemana])
 
   const totalPorCategoria = useMemo(() => {
-    const totais: Record<string, number> = {};
+    const totais: Record<string, number> = {}
     Object.values(dadosPorSemana).forEach((semana) => {
       Object.entries(semana).forEach(([cat, valor]) => {
-        totais[cat] = (totais[cat] || 0) + valor;
-      });
-    });
+        totais[cat] = (totais[cat] || 0) + valor
+      })
+    })
     return Object.entries(totais)
       .sort((a, b) => b[1] - a[1])
-      .map(([categoria, valor]) => ({ categoria, valor }));
-  }, [dadosPorSemana]);
+      .map(([categoria, valor]) => ({ categoria, valor }))
+  }, [dadosPorSemana])
 
-  const mediaSemanal = totalMes / 4;
+  const mediaSemanal = totalMes / 4
 
   const formatarMesAno = (mesAno: string) => {
-    const [ano, mes] = mesAno.split("-");
+    const [ano, mes] = mesAno.split('-')
     const meses = [
-      "Janeiro",
-      "Fevereiro",
-      "Março",
-      "Abril",
-      "Maio",
-      "Junho",
-      "Julho",
-      "Agosto",
-      "Setembro",
-      "Outubro",
-      "Novembro",
-      "Dezembro",
-    ];
-    return `${meses[parseInt(mes) - 1]} ${ano}`;
-  };
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ]
+    return `${meses[parseInt(mes) - 1]} ${ano}`
+  }
 
   if (carregando) {
     return (
@@ -332,7 +327,7 @@ export function DashboardFinanceiro() {
           <p className="text-gray-600">Carregando dados...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (erro) {
@@ -348,7 +343,7 @@ export function DashboardFinanceiro() {
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -439,9 +434,10 @@ export function DashboardFinanceiro() {
           </h2>
           <div className="space-y-3 max-h-80 overflow-y-auto">
             {totalPorCategoria.map(({ categoria, valor }) => {
-              const config = CATEGORIA_CONFIG[categoria] || CATEGORIA_CONFIG.OUTROS;
-              const Icon = config.icon;
-              const percentual = totalMes > 0 ? (valor / totalMes) * 100 : 0;
+              const config =
+                CATEGORIA_CONFIG[categoria] || CATEGORIA_CONFIG.OUTROS
+              const Icon = config.icon
+              const percentual = totalMes > 0 ? (valor / totalMes) * 100 : 0
 
               return (
                 <div key={categoria} className="flex items-center gap-3">
@@ -449,10 +445,7 @@ export function DashboardFinanceiro() {
                     className="p-2 rounded-lg"
                     style={{ backgroundColor: `${config.color}20` }}
                   >
-                    <Icon
-                      className="w-4 h-4"
-                      style={{ color: config.color }}
-                    />
+                    <Icon className="w-4 h-4" style={{ color: config.color }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1">
@@ -474,7 +467,7 @@ export function DashboardFinanceiro() {
                     </div>
                   </div>
                 </div>
-              );
+              )
             })}
             {totalPorCategoria.length === 0 && (
               <p className="text-gray-500 text-center py-4">
@@ -491,7 +484,7 @@ export function DashboardFinanceiro() {
         </h2>
         <div className="flex flex-wrap gap-4">
           {Object.entries(CATEGORIA_CONFIG).map(([key, config]) => {
-            const Icon = config.icon;
+            const Icon = config.icon
             return (
               <div
                 key={key}
@@ -500,10 +493,10 @@ export function DashboardFinanceiro() {
                 <Icon className="w-4 h-4" style={{ color: config.color }} />
                 <span className="text-sm text-gray-700">{config.label}</span>
               </div>
-            );
+            )
           })}
         </div>
       </div>
     </div>
-  );
+  )
 }

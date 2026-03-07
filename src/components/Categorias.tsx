@@ -1,199 +1,203 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface Categoria {
-  _id: string;
-  codigo: string;
-  nome: string;
-  descricao: string;
-  icone: string;
-  cor: string;
+  _id: string
+  codigo: string
+  nome: string
+  descricao: string
+  icone: string
+  cor: string
 }
 
 interface Prefixo {
-  _id: string;
-  prefixo: string;
-  categoria: Categoria;
+  _id: string
+  prefixo: string
+  categoria: Categoria
 }
 
 interface CategoriasProps {
   /** Quando true, oculta o título principal (uso dentro de Configurações) */
-  compact?: boolean;
+  compact?: boolean
 }
 
 export function Categorias({ compact }: CategoriasProps) {
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
-  const [novoPrefixo, setNovoPrefixo] = useState("");
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
-  const [carregando, setCarregando] = useState(true);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [sucesso, setSucesso] = useState<string | null>(null);
-  const [editando, setEditando] = useState<Prefixo | null>(null);
-  const [editPrefixo, setEditPrefixo] = useState("");
-  const [editCategoria, setEditCategoria] = useState("");
+  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [prefixos, setPrefixos] = useState<Prefixo[]>([])
+  const [novoPrefixo, setNovoPrefixo] = useState('')
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState('')
+  const [carregando, setCarregando] = useState(true)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [sucesso, setSucesso] = useState<string | null>(null)
+  const [editando, setEditando] = useState<Prefixo | null>(null)
+  const [editPrefixo, setEditPrefixo] = useState('')
+  const [editCategoria, setEditCategoria] = useState('')
 
   useEffect(() => {
-    carregarDados();
-  }, []);
+    carregarDados()
+  }, [])
 
   const carregarDados = async () => {
     try {
       const [categoriasRes, prefixosRes] = await Promise.all([
         fetch(`${API_URL}/categorias`),
         fetch(`${API_URL}/categorias/prefixos/listar`),
-      ]);
+      ])
 
       if (!categoriasRes.ok || !prefixosRes.ok) {
-        throw new Error("Erro ao carregar dados");
+        throw new Error('Erro ao carregar dados')
       }
 
-      const categoriasData = await categoriasRes.json();
-      const prefixosData = await prefixosRes.json();
+      const categoriasData = await categoriasRes.json()
+      const prefixosData = await prefixosRes.json()
 
-      setCategorias(categoriasData);
-      setPrefixos(prefixosData);
+      setCategorias(categoriasData)
+      setPrefixos(prefixosData)
 
       if (categoriasData.length > 0 && !categoriaSelecionada) {
-        setCategoriaSelecionada(categoriasData[0]._id);
+        setCategoriaSelecionada(categoriasData[0]._id)
       }
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro desconhecido");
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
-      setCarregando(false);
+      setCarregando(false)
     }
-  };
+  }
 
   const salvarPrefixo = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
-    if (!novoPrefixo.trim() || !categoriaSelecionada) return;
+    if (!novoPrefixo.trim() || !categoriaSelecionada) return
 
-    setSalvando(true);
-    setErro(null);
-    setSucesso(null);
+    setSalvando(true)
+    setErro(null)
+    setSucesso(null)
 
     try {
       const response = await fetch(`${API_URL}/categorias/prefixos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prefixo: novoPrefixo.trim(),
           categoriaId: categoriaSelecionada,
         }),
-      });
+      })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Erro ${response.status}`);
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
-      const novoPrefixoSalvo = await response.json();
+      const novoPrefixoSalvo = await response.json()
       setPrefixos((prev) =>
         [...prev, novoPrefixoSalvo].sort((a, b) =>
-          a.prefixo.localeCompare(b.prefixo)
-        )
-      );
-      setNovoPrefixo("");
-      setSucesso(`Prefixo "${novoPrefixoSalvo.prefixo}" cadastrado com sucesso!`);
+          a.prefixo.localeCompare(b.prefixo),
+        ),
+      )
+      setNovoPrefixo('')
+      setSucesso(
+        `Prefixo "${novoPrefixoSalvo.prefixo}" cadastrado com sucesso!`,
+      )
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao salvar prefixo");
+      setErro(e instanceof Error ? e.message : 'Erro ao salvar prefixo')
     } finally {
-      setSalvando(false);
+      setSalvando(false)
     }
-  };
+  }
 
   const removerPrefixo = async (id: string, prefixo: string) => {
-    if (!confirm(`Deseja remover o prefixo "${prefixo}"?`)) return;
+    if (!confirm(`Deseja remover o prefixo "${prefixo}"?`)) return
 
     try {
       const response = await fetch(`${API_URL}/categorias/prefixos/${id}`, {
-        method: "DELETE",
-      });
+        method: 'DELETE',
+      })
 
       if (!response.ok) {
-        throw new Error("Erro ao remover prefixo");
+        throw new Error('Erro ao remover prefixo')
       }
 
-      setPrefixos((prev) => prev.filter((p) => p._id !== id));
-      setSucesso(`Prefixo "${prefixo}" removido com sucesso!`);
+      setPrefixos((prev) => prev.filter((p) => p._id !== id))
+      setSucesso(`Prefixo "${prefixo}" removido com sucesso!`)
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao remover prefixo");
+      setErro(e instanceof Error ? e.message : 'Erro ao remover prefixo')
     }
-  };
+  }
 
   const iniciarEdicao = (prefixo: Prefixo) => {
-    setEditando(prefixo);
-    setEditPrefixo(prefixo.prefixo);
-    setEditCategoria(prefixo.categoria._id);
-    setErro(null);
-    setSucesso(null);
-  };
+    setEditando(prefixo)
+    setEditPrefixo(prefixo.prefixo)
+    setEditCategoria(prefixo.categoria._id)
+    setErro(null)
+    setSucesso(null)
+  }
 
   const cancelarEdicao = () => {
-    setEditando(null);
-    setEditPrefixo("");
-    setEditCategoria("");
-  };
+    setEditando(null)
+    setEditPrefixo('')
+    setEditCategoria('')
+  }
 
   const salvarEdicao = async () => {
-    if (!editando || !editPrefixo.trim() || !editCategoria) return;
+    if (!editando || !editPrefixo.trim() || !editCategoria) return
 
-    setSalvando(true);
-    setErro(null);
+    setSalvando(true)
+    setErro(null)
 
     try {
       const response = await fetch(
         `${API_URL}/categorias/prefixos/${editando._id}`,
         {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prefixo: editPrefixo.trim(),
             categoriaId: editCategoria,
           }),
-        }
-      );
+        },
+      )
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Erro ${response.status}`);
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
-      const prefixoAtualizado = await response.json();
+      const prefixoAtualizado = await response.json()
       setPrefixos((prev) =>
         prev
           .map((p) => (p._id === editando._id ? prefixoAtualizado : p))
-          .sort((a, b) => a.prefixo.localeCompare(b.prefixo))
-      );
-      setSucesso(`Prefixo "${prefixoAtualizado.prefixo}" atualizado com sucesso!`);
-      cancelarEdicao();
+          .sort((a, b) => a.prefixo.localeCompare(b.prefixo)),
+      )
+      setSucesso(
+        `Prefixo "${prefixoAtualizado.prefixo}" atualizado com sucesso!`,
+      )
+      cancelarEdicao()
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao atualizar prefixo");
+      setErro(e instanceof Error ? e.message : 'Erro ao atualizar prefixo')
     } finally {
-      setSalvando(false);
+      setSalvando(false)
     }
-  };
+  }
 
   const prefixosPorCategoria = prefixos.reduce(
     (acc, prefixo) => {
-      const catId = prefixo.categoria?._id || "sem-categoria";
+      const catId = prefixo.categoria?._id || 'sem-categoria'
       if (!acc[catId]) {
-        acc[catId] = [];
+        acc[catId] = []
       }
-      acc[catId].push(prefixo);
-      return acc;
+      acc[catId].push(prefixo)
+      return acc
     },
-    {} as Record<string, Prefixo[]>
-  );
+    {} as Record<string, Prefixo[]>,
+  )
 
   const getCategoriaById = (id: string) => {
-    return categorias.find((c) => c._id === id);
-  };
+    return categorias.find((c) => c._id === id)
+  }
 
   if (carregando) {
     return (
@@ -203,11 +207,11 @@ export function Categorias({ compact }: CategoriasProps) {
           <p className="text-gray-600">Carregando categorias...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className={compact ? "" : "max-w-4xl mx-auto p-6"}>
+    <div className={compact ? '' : 'max-w-4xl mx-auto p-6'}>
       {!compact && (
         <header className="text-center mb-8">
           <h1 className="text-3xl font-bold text-green-800 mb-2">
@@ -290,7 +294,7 @@ export function Categorias({ compact }: CategoriasProps) {
                 disabled={!editPrefixo.trim() || salvando}
                 className="px-4 py-2 bg-green-800 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {salvando ? "Salvando..." : "Salvar"}
+                {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>
@@ -301,9 +305,15 @@ export function Categorias({ compact }: CategoriasProps) {
         <h2 className="text-lg font-semibold text-gray-800 mb-4">
           Cadastrar Novo Prefixo
         </h2>
-        <form onSubmit={salvarPrefixo} className="flex flex-col sm:flex-row gap-4">
+        <form
+          onSubmit={salvarPrefixo}
+          className="flex flex-col sm:flex-row gap-4"
+        >
           <div className="flex-1">
-            <label htmlFor="prefixo" className="block text-sm text-gray-600 mb-1">
+            <label
+              htmlFor="prefixo"
+              className="block text-sm text-gray-600 mb-1"
+            >
               Prefixo (início do nome do produto)
             </label>
             <input
@@ -316,7 +326,10 @@ export function Categorias({ compact }: CategoriasProps) {
             />
           </div>
           <div className="flex-1">
-            <label htmlFor="categoria" className="block text-sm text-gray-600 mb-1">
+            <label
+              htmlFor="categoria"
+              className="block text-sm text-gray-600 mb-1"
+            >
               Categoria
             </label>
             <select
@@ -338,7 +351,7 @@ export function Categorias({ compact }: CategoriasProps) {
               disabled={!novoPrefixo.trim() || salvando}
               className="px-6 py-3 bg-green-800 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {salvando ? "Salvando..." : "Cadastrar"}
+              {salvando ? 'Salvando...' : 'Cadastrar'}
             </button>
           </div>
         </form>
@@ -356,21 +369,21 @@ export function Categorias({ compact }: CategoriasProps) {
         ) : (
           <div className="space-y-6">
             {Object.entries(prefixosPorCategoria).map(([catId, items]) => {
-              const categoria = getCategoriaById(catId);
+              const categoria = getCategoriaById(catId)
               return (
                 <div key={catId}>
                   <h3
                     className="text-sm font-medium mb-2 border-b pb-1 flex items-center gap-2"
-                    style={{ 
-                      color: categoria?.cor || "#666",
-                      borderColor: categoria?.cor || "#e5e7eb"
+                    style={{
+                      color: categoria?.cor || '#666',
+                      borderColor: categoria?.cor || '#e5e7eb',
                     }}
                   >
                     <span
                       className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: categoria?.cor || "#9ca3af" }}
+                      style={{ backgroundColor: categoria?.cor || '#9ca3af' }}
                     />
-                    {categoria?.nome || "Sem categoria"}
+                    {categoria?.nome || 'Sem categoria'}
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {items.map((prefixo) => (
@@ -389,7 +402,9 @@ export function Categorias({ compact }: CategoriasProps) {
                           ✎
                         </button>
                         <button
-                          onClick={() => removerPrefixo(prefixo._id, prefixo.prefixo)}
+                          onClick={() =>
+                            removerPrefixo(prefixo._id, prefixo.prefixo)
+                          }
                           className="text-gray-400 hover:text-red-500 transition-colors"
                           title="Remover prefixo"
                         >
@@ -399,11 +414,11 @@ export function Categorias({ compact }: CategoriasProps) {
                     ))}
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
