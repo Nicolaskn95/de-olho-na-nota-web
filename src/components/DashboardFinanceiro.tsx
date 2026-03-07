@@ -28,38 +28,12 @@ import {
   TrendingDown,
   Calendar,
 } from 'lucide-react'
+import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
+import { NotaFiscal } from '@/interface/NotaFiscal/INotaFiscal'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
-
-interface Produto {
-  nome: string
-  quantidade: number
-  unidade: string
-  valorUnitario: number
-  valorTotal: number
-}
-
-interface NotaFiscal {
-  _id: string
-  dataEmissao: string
-  valorPago: number
-  produtos: Produto[]
-}
-
-interface Categoria {
-  _id: string
-  codigo: string
-  nome: string
-  cor: string
-  icone: string
-}
-
-interface Prefixo {
-  prefixo: string
-  categoria: Categoria
-}
 
 const ICONE_MAP: Record<string, React.ElementType> = {
   Beef,

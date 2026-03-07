@@ -1,23 +1,9 @@
 'use client'
 
+import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
 import { useState, useEffect } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-
-interface Categoria {
-  _id: string
-  codigo: string
-  nome: string
-  descricao: string
-  icone: string
-  cor: string
-}
-
-interface Prefixo {
-  _id: string
-  prefixo: string
-  categoria: Categoria
-}
 
 interface CategoriasProps {
   /** Quando true, oculta o título principal (uso dentro de Configurações) */

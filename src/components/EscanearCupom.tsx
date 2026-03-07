@@ -3,24 +3,9 @@
 import { useState } from 'react'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import { Html5Qrcode } from 'html5-qrcode'
+import { NotaFiscalResponse } from '@/interface/NotaFiscal/INotaFiscal'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-
-interface NotaFiscalResponse {
-  _id: string
-  chaveAcesso: string
-  numero: string
-  estabelecimento: string
-  valorTotal: number
-  valorPago: number
-  produtos: Array<{
-    nome: string
-    quantidade: number
-    unidade: string
-    valorUnitario: number
-    valorTotal: number
-  }>
-}
 
 export function EscanearCupom() {
   const [conteudoLido, setConteudoLido] = useState<string | null>(null)

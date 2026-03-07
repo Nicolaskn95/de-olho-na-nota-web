@@ -1,50 +1,10 @@
 'use client'
 
+import { GastosMensais, NotaFiscal } from '@/interface/NotaFiscal/INotaFiscal'
+import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
 import { useState, useEffect } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-
-interface Produto {
-  nome: string
-  quantidade: number
-  unidade: string
-  valorUnitario: number
-  valorTotal: number
-}
-
-interface NotaFiscal {
-  _id: string
-  chaveAcesso: string
-  numero: string
-  dataEmissao: string
-  estabelecimento: string
-  valorTotal: number
-  valorPago: number
-  produtos: Produto[]
-}
-
-interface GastosMensais {
-  mes: string
-  mesNumero: number
-  ano: number
-  total: number
-  notas: NotaFiscal[]
-}
-
-interface Categoria {
-  _id: string
-  codigo: string
-  nome: string
-  descricao: string
-  icone: string
-  cor: string
-}
-
-interface Prefixo {
-  _id: string
-  prefixo: string
-  categoria: Categoria
-}
 
 export function NotasFiscais() {
   const [notas, setNotas] = useState<NotaFiscal[]>([])

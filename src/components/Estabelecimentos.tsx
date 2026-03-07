@@ -1,14 +1,9 @@
 'use client'
 
+import { EstabelecimentoItem } from '@/interface/Estabelecimento/IEstabelecimento'
 import { useState, useEffect } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-
-interface EstabelecimentoItem {
-  cnpj: string
-  estabelecimento: string
-  totalNotas: number
-}
 
 export function Estabelecimentos() {
   const [lista, setLista] = useState<EstabelecimentoItem[]>([])
