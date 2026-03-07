@@ -1,5 +1,5 @@
-import { Categorias } from "@/components/Categorias";
-import { Estabelecimentos } from "@/components/Estabelecimentos";
+import { Categorias } from '@/components/Categorias'
+import { Estabelecimentos } from '@/components/Estabelecimentos'
 
 export default function ConfiguracoesPage() {
   return (
@@ -29,5 +29,5 @@ export default function ConfiguracoesPage() {
         </section>
       </div>
     </main>
-  );
+  )
 }
