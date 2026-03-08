@@ -323,16 +323,23 @@ export function NotasFiscais() {
                                     )}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap justify-end">
                                   <span
-                                    className={`text-xs px-2 py-0.5 rounded-full ${
-                                      categoria
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-gray-100 text-gray-500'
-                                    }`}
+                                    className="text-xs px-2 py-0.5 rounded-full border"
+                                    style={{
+                                      backgroundColor:
+                                        categoria?.cor || '#f3f4f6',
+                                      borderColor: categoria?.cor || '#e5e7eb',
+                                      color: categoria ? '#ffffff' : '#6b7280',
+                                    }}
                                   >
                                     {categoria?.nome || 'Outros'}
                                   </span>
+                                  {produto.unidade?.toUpperCase() === 'KG' && (
+                                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                                      {formatarMoeda(produto.valorUnitario)}/kg
+                                    </span>
+                                  )}
                                   <span className="text-gray-800 font-medium whitespace-nowrap">
                                     {formatarMoeda(produto.valorTotal)}
                                   </span>

@@ -50,28 +50,6 @@ const ICONE_MAP: Record<string, React.ElementType> = {
   ShoppingCart,
 }
 
-const CATEGORIA_CONFIG: Record<
-  string,
-  { label: string; color: string; icon: React.ElementType }
-> = {
-  ACOUGUE_E_PEIXARIA: { label: 'Açougue', color: '#dc2626', icon: Beef },
-  HORTIFRUTI: { label: 'Hortifruti', color: '#16a34a', icon: Apple },
-  LATICINIOS_E_OVOS: { label: 'Laticínios', color: '#f59e0b', icon: Milk },
-  PADARIA_E_CONFEITARIA: {
-    label: 'Padaria',
-    color: '#d97706',
-    icon: Croissant,
-  },
-  MERCEARIA_SECA: { label: 'Mercearia', color: '#8b5cf6', icon: Package },
-  CONGELADOS: { label: 'Congelados', color: '#0ea5e9', icon: Snowflake },
-  BEBIDAS: { label: 'Bebidas', color: '#ec4899', icon: Wine },
-  LIMPEZA: { label: 'Limpeza', color: '#06b6d4', icon: SprayCan },
-  HIGIENE_E_BELEZA: { label: 'Higiene', color: '#f472b6', icon: Sparkles },
-  PET_SHOP: { label: 'Pet Shop', color: '#a855f7', icon: PawPrint },
-  UTILIDADES_DOMESTICAS: { label: 'Utilidades', color: '#64748b', icon: Lamp },
-  OUTROS: { label: 'Outros', color: '#9ca3af', icon: ShoppingCart },
-}
-
 function getWeekOfMonth(date: Date): number {
   const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
   const dayOfMonth = date.getDate()
@@ -210,17 +188,23 @@ export function DashboardFinanceiro() {
   const chartData = useMemo(() => {
     const labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Semana 5']
 
-    const datasets = categoriasAtivas.map((categoria) => ({
-      label: CATEGORIA_CONFIG[categoria]?.label || categoria,
-      data: [1, 2, 3, 4, 5].map(
-        (semana) => dadosPorSemana[semana]?.[categoria] || 0,
-      ),
-      backgroundColor: CATEGORIA_CONFIG[categoria]?.color || '#9ca3af',
-      borderRadius: 4,
-    }))
+    const datasets = categoriasAtivas.map((codigo) => {
+      const categoria = categorias.find((c) => c.codigo === codigo)
+      const color = categoria?.cor || '#9ca3af'
+      const label = categoria?.nome || codigo
+
+      return {
+        label,
+        data: [1, 2, 3, 4, 5].map(
+          (semana) => dadosPorSemana[semana]?.[codigo] || 0,
+        ),
+        backgroundColor: color,
+        borderRadius: 4,
+      }
+    })
 
     return { labels, datasets }
-  }, [dadosPorSemana, categoriasAtivas])
+  }, [dadosPorSemana, categoriasAtivas, categorias])
 
   const chartOptions = {
     responsive: true,
@@ -408,23 +392,24 @@ export function DashboardFinanceiro() {
           </h2>
           <div className="space-y-3 max-h-80 overflow-y-auto">
             {totalPorCategoria.map(({ categoria, valor }) => {
-              const config =
-                CATEGORIA_CONFIG[categoria] || CATEGORIA_CONFIG.OUTROS
-              const Icon = config.icon
+              const cat = categorias.find((c) => c.codigo === categoria)
+              const color = cat?.cor || '#9ca3af'
+              const Icon =
+                ICONE_MAP[cat?.icone || 'ShoppingCart'] || ShoppingCart
               const percentual = totalMes > 0 ? (valor / totalMes) * 100 : 0
 
               return (
                 <div key={categoria} className="flex items-center gap-3">
                   <div
                     className="p-2 rounded-lg"
-                    style={{ backgroundColor: `${config.color}20` }}
+                    style={{ backgroundColor: `${color}20` }}
                   >
-                    <Icon className="w-4 h-4" style={{ color: config.color }} />
+                    <Icon className="w-4 h-4" style={{ color }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-sm font-medium text-gray-700 truncate">
-                        {config.label}
+                        {cat?.nome || categoria}
                       </span>
                       <span className="text-sm font-semibold text-gray-800">
                         R$ {valor.toFixed(2)}
@@ -435,7 +420,7 @@ export function DashboardFinanceiro() {
                         className="h-2 rounded-full transition-all"
                         style={{
                           width: `${percentual}%`,
-                          backgroundColor: config.color,
+                          backgroundColor: color,
                         }}
                       />
                     </div>
@@ -457,15 +442,15 @@ export function DashboardFinanceiro() {
           Legenda das Categorias
         </h2>
         <div className="flex flex-wrap gap-4">
-          {Object.entries(CATEGORIA_CONFIG).map(([key, config]) => {
-            const Icon = config.icon
+          {categorias.map((cat) => {
+            const Icon = ICONE_MAP[cat.icone] || ShoppingCart
             return (
               <div
-                key={key}
+                key={cat._id}
                 className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full"
               >
-                <Icon className="w-4 h-4" style={{ color: config.color }} />
-                <span className="text-sm text-gray-700">{config.label}</span>
+                <Icon className="w-4 h-4" style={{ color: cat.cor }} />
+                <span className="text-sm text-gray-700">{cat.nome}</span>
               </div>
             )
           })}

@@ -1,7 +1,7 @@
 'use client'
 
 import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -23,11 +23,7 @@ export function Categorias({ compact }: CategoriasProps) {
   const [editPrefixo, setEditPrefixo] = useState('')
   const [editCategoria, setEditCategoria] = useState('')
 
-  useEffect(() => {
-    carregarDados()
-  }, [])
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     try {
       const [categoriasRes, prefixosRes] = await Promise.all([
         fetch(`${API_URL}/categorias`),
@@ -52,7 +48,11 @@ export function Categorias({ compact }: CategoriasProps) {
     } finally {
       setCarregando(false)
     }
-  }
+  }, [categoriaSelecionada])
+
+  useEffect(() => {
+    carregarDados()
+  }, [carregarDados])
 
   const salvarPrefixo = async (e: React.FormEvent) => {
     e.preventDefault()
