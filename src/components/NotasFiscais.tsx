@@ -2,7 +2,12 @@
 
 import { GastosMensais, NotaFiscal } from '@/interface/NotaFiscal/INotaFiscal'
 import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import {
+  ModalTodosProdutos,
+  type CompraProduto,
+  type ProdutoAgrupado,
+} from '@/components/ModalTodosProdutos'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -15,6 +20,7 @@ export function NotasFiscais() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [prefixos, setPrefixos] = useState<Prefixo[]>([])
+  const [modalProdutosAberto, setModalProdutosAberto] = useState(false)
 
   useEffect(() => {
     carregarDados()
@@ -159,6 +165,33 @@ export function NotasFiscais() {
     return data.toLocaleDateString('pt-BR')
   }
 
+  const produtosAgrupadosPorNome = useMemo(() => {
+    const mapa = new Map<string, ProdutoAgrupado>()
+    for (const nota of notas) {
+      for (const p of nota.produtos || []) {
+        const nomeNorm = p.nome.trim()
+        if (!nomeNorm) continue
+        const compra: CompraProduto = {
+          estabelecimento: nota.estabelecimento,
+          dataEmissao: nota.dataEmissao,
+          quantidade: p.quantidade,
+          unidade: p.unidade,
+          valorUnitario: p.valorUnitario,
+          valorTotal: p.valorTotal,
+        }
+        const existente = mapa.get(nomeNorm)
+        if (existente) {
+          existente.compras.push(compra)
+        } else {
+          mapa.set(nomeNorm, { nome: nomeNorm, compras: [compra] })
+        }
+      }
+    }
+    return Array.from(mapa.values()).sort((a, b) =>
+      a.nome.localeCompare(b.nome),
+    )
+  }, [notas])
+
   if (carregando) {
     return (
       <div className="max-w-4xl mx-auto p-6">
@@ -229,6 +262,16 @@ export function NotasFiscais() {
             {formatarMoeda(totalGeral / notas.length)}
           </p>
         </div>
+      </div>
+
+      <div className="mb-6 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setModalProdutosAberto(true)}
+          className="px-4 py-2 bg-green-800 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+        >
+          Agrupar os produtos
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -357,6 +400,12 @@ export function NotasFiscais() {
           )}
         </div>
       </div>
+
+      <ModalTodosProdutos
+        open={modalProdutosAberto}
+        onClose={() => setModalProdutosAberto(false)}
+        produtos={produtosAgrupadosPorNome}
+      />
     </div>
   )
 }
