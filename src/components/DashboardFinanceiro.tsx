@@ -1,6 +1,7 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from "react";
+import { getAccessToken, getAuthHeaders } from "@/lib/auth-api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -9,8 +10,8 @@ import {
   Title,
   Tooltip,
   Legend,
-} from 'chart.js'
-import { Bar } from 'react-chartjs-2'
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
 import {
   Beef,
   Apple,
@@ -28,13 +29,20 @@ import {
   TrendingDown,
   Calendar,
   Clock,
-} from 'lucide-react'
-import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
-import { NotaFiscal } from '@/interface/NotaFiscal/INotaFiscal'
+} from "lucide-react";
+import { Categoria, Prefixo } from "@/interface/Prefixo/IPrefixo";
+import { NotaFiscal } from "@/interface/NotaFiscal/INotaFiscal";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 const ICONE_MAP: Record<string, React.ElementType> = {
   Beef,
@@ -49,121 +57,139 @@ const ICONE_MAP: Record<string, React.ElementType> = {
   PawPrint,
   Lamp,
   ShoppingCart,
-}
+};
 
 function getWeekOfMonth(date: Date): number {
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1)
-  const dayOfMonth = date.getDate()
-  const firstDayOfWeek = firstDay.getDay()
-  return Math.ceil((dayOfMonth + firstDayOfWeek) / 7)
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  const dayOfMonth = date.getDate();
+  const firstDayOfWeek = firstDay.getDay();
+  return Math.ceil((dayOfMonth + firstDayOfWeek) / 7);
 }
 
 function categorizarProduto(
   nomeProduto: string,
   prefixos: Prefixo[],
 ): { categoriaId: string; categoriaCodigo: string } | null {
-  const nomeUpper = nomeProduto.toUpperCase()
+  const nomeUpper = nomeProduto.toUpperCase();
 
   const prefixosOrdenados = [...prefixos].sort(
     (a, b) => b.prefixo.length - a.prefixo.length,
-  )
+  );
 
   for (const p of prefixosOrdenados) {
     if (nomeUpper.startsWith(p.prefixo) && p.categoria) {
       return {
         categoriaId: p.categoria._id,
         categoriaCodigo: p.categoria.codigo,
-      }
+      };
     }
   }
-  return null
+  return null;
 }
 
 export function DashboardFinanceiro() {
-  const [notas, setNotas] = useState<NotaFiscal[]>([])
-  const [prefixos, setPrefixos] = useState<Prefixo[]>([])
-  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [notas, setNotas] = useState<NotaFiscal[]>([]);
+  const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [mesSelecionado, setMesSelecionado] = useState(() => {
-    const hoje = new Date()
-    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
-  })
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-  const [produtoComparacao1, setProdutoComparacao1] = useState('')
-  const [produtoComparacao2, setProdutoComparacao2] = useState('')
-  const [searchProduto1, setSearchProduto1] = useState('')
-  const [listaProdutosBackend, setListaProdutosBackend] = useState<string[]>([])
-  const [sugestoesProduto2, setSugestoesProduto2] = useState<string[]>([])
+    const hoje = new Date();
+    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [produtoComparacao1, setProdutoComparacao1] = useState("");
+  const [produtoComparacao2, setProdutoComparacao2] = useState("");
+  const [searchProduto1, setSearchProduto1] = useState("");
+  const [listaProdutosBackend, setListaProdutosBackend] = useState<string[]>(
+    [],
+  );
+  const [sugestoesProduto2, setSugestoesProduto2] = useState<string[]>([]);
   const [resultadoComparacao, setResultadoComparacao] = useState<{
-    produto1: { nome: string; totalCompras: number; duracaoMediaDias: number | null; duracaoEntreComprasDias: number[] }
-    produto2: { nome: string; totalCompras: number; duracaoMediaDias: number | null; duracaoEntreComprasDias: number[] }
-  } | null>(null)
-  const [dropdownProduto1Aberto, setDropdownProduto1Aberto] = useState(false)
-  const [loadingProdutos, setLoadingProdutos] = useState(false)
-  const [loadingSugestoes, setLoadingSugestoes] = useState(false)
-  const [loadingComparacao, setLoadingComparacao] = useState(false)
+    produto1: {
+      nome: string;
+      totalCompras: number;
+      duracaoMediaDias: number | null;
+      duracaoEntreComprasDias: number[];
+    };
+    produto2: {
+      nome: string;
+      totalCompras: number;
+      duracaoMediaDias: number | null;
+      duracaoEntreComprasDias: number[];
+    };
+  } | null>(null);
+  const [dropdownProduto1Aberto, setDropdownProduto1Aberto] = useState(false);
+  const [loadingProdutos, setLoadingProdutos] = useState(false);
+  const [loadingSugestoes, setLoadingSugestoes] = useState(false);
+  const [loadingComparacao, setLoadingComparacao] = useState(false);
 
   useEffect(() => {
-    carregarDados()
-  }, [])
+    carregarDados();
+  }, []);
 
   const carregarDados = async () => {
     try {
+      const token = getAccessToken();
+      if (!token) {
+        throw new Error("Faça login para ver seus dados financeiros.");
+      }
       const [notasRes, prefixosRes, categoriasRes] = await Promise.all([
-        fetch(`${API_URL}/notas-fiscais`),
+        fetch(`${API_URL}/notas-fiscais`, {
+          headers: getAuthHeaders(),
+        }),
         fetch(`${API_URL}/categorias/prefixos/listar`),
         fetch(`${API_URL}/categorias`),
-      ])
+      ]);
 
       if (!notasRes.ok || !prefixosRes.ok || !categoriasRes.ok) {
-        throw new Error('Erro ao carregar dados')
+        throw new Error("Erro ao carregar dados");
       }
 
-      const notasData = await notasRes.json()
-      const prefixosData = await prefixosRes.json()
-      const categoriasData = await categoriasRes.json()
+      const notasData = await notasRes.json();
+      const prefixosData = await prefixosRes.json();
+      const categoriasData = await categoriasRes.json();
 
-      setNotas(notasData)
-      setPrefixos(prefixosData)
-      setCategorias(categoriasData)
+      setNotas(notasData);
+      setPrefixos(prefixosData);
+      setCategorias(categoriasData);
 
       // Selecionar automaticamente o mês mais recente com notas
       if (notasData.length > 0) {
-        const mesesComNotas = new Set<string>()
+        const mesesComNotas = new Set<string>();
         notasData.forEach((nota: NotaFiscal) => {
-          const data = new Date(nota.dataEmissao)
-          const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
-          mesesComNotas.add(mesAno)
-        })
-        const mesesOrdenados = Array.from(mesesComNotas).sort().reverse()
+          const data = new Date(nota.dataEmissao);
+          const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+          mesesComNotas.add(mesAno);
+        });
+        const mesesOrdenados = Array.from(mesesComNotas).sort().reverse();
         if (mesesOrdenados.length > 0) {
-          setMesSelecionado(mesesOrdenados[0])
+          setMesSelecionado(mesesOrdenados[0]);
         }
       }
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro desconhecido')
+      setErro(e instanceof Error ? e.message : "Erro desconhecido");
     } finally {
-      setCarregando(false)
+      setCarregando(false);
     }
-  }
+  };
 
   const mesesDisponiveis = useMemo(() => {
-    const meses = new Set<string>()
+    const meses = new Set<string>();
     notas.forEach((nota) => {
-      const data = new Date(nota.dataEmissao)
-      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`
-      meses.add(mesAno)
-    })
-    return Array.from(meses).sort().reverse()
-  }, [notas])
+      const data = new Date(nota.dataEmissao);
+      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+      meses.add(mesAno);
+    });
+    return Array.from(meses).sort().reverse();
+  }, [notas]);
 
   const dadosPorSemana = useMemo(() => {
-    const [ano, mes] = mesSelecionado.split('-').map(Number)
+    const [ano, mes] = mesSelecionado.split("-").map(Number);
 
     const notasDoMes = notas.filter((nota) => {
-      const data = new Date(nota.dataEmissao)
-      return data.getFullYear() === ano && data.getMonth() === mes - 1
-    })
+      const data = new Date(nota.dataEmissao);
+      return data.getFullYear() === ano && data.getMonth() === mes - 1;
+    });
 
     const semanas: Record<number, Record<string, number>> = {
       1: {},
@@ -171,41 +197,41 @@ export function DashboardFinanceiro() {
       3: {},
       4: {},
       5: {},
-    }
+    };
 
     notasDoMes.forEach((nota) => {
-      const data = new Date(nota.dataEmissao)
-      const semana = getWeekOfMonth(data)
+      const data = new Date(nota.dataEmissao);
+      const semana = getWeekOfMonth(data);
 
       if (nota.produtos && Array.isArray(nota.produtos)) {
         nota.produtos.forEach((produto) => {
-          const resultado = categorizarProduto(produto.nome, prefixos)
-          const categoriaCodigo = resultado?.categoriaCodigo || 'OUTROS'
-          if (!semanas[semana]) semanas[semana] = {}
+          const resultado = categorizarProduto(produto.nome, prefixos);
+          const categoriaCodigo = resultado?.categoriaCodigo || "OUTROS";
+          if (!semanas[semana]) semanas[semana] = {};
           semanas[semana][categoriaCodigo] =
-            (semanas[semana][categoriaCodigo] || 0) + produto.valorTotal
-        })
+            (semanas[semana][categoriaCodigo] || 0) + produto.valorTotal;
+        });
       }
-    })
+    });
 
-    return semanas
-  }, [notas, prefixos, mesSelecionado])
+    return semanas;
+  }, [notas, prefixos, mesSelecionado]);
 
   const categoriasAtivas = useMemo(() => {
-    const cats = new Set<string>()
+    const cats = new Set<string>();
     Object.values(dadosPorSemana).forEach((semana) => {
-      Object.keys(semana).forEach((cat) => cats.add(cat))
-    })
-    return Array.from(cats)
-  }, [dadosPorSemana])
+      Object.keys(semana).forEach((cat) => cats.add(cat));
+    });
+    return Array.from(cats);
+  }, [dadosPorSemana]);
 
   const chartData = useMemo(() => {
-    const labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Semana 5']
+    const labels = ["Semana 1", "Semana 2", "Semana 3", "Semana 4", "Semana 5"];
 
     const datasets = categoriasAtivas.map((codigo) => {
-      const categoria = categorias.find((c) => c.codigo === codigo)
-      const color = categoria?.cor || '#9ca3af'
-      const label = categoria?.nome || codigo
+      const categoria = categorias.find((c) => c.codigo === codigo);
+      const color = categoria?.cor || "#9ca3af";
+      const label = categoria?.nome || codigo;
 
       return {
         label,
@@ -214,11 +240,11 @@ export function DashboardFinanceiro() {
         ),
         backgroundColor: color,
         borderRadius: 4,
-      }
-    })
+      };
+    });
 
-    return { labels, datasets }
-  }, [dadosPorSemana, categoriasAtivas, categorias])
+    return { labels, datasets };
+  }, [dadosPorSemana, categoriasAtivas, categorias]);
 
   const chartOptions = {
     responsive: true,
@@ -230,8 +256,8 @@ export function DashboardFinanceiro() {
       tooltip: {
         callbacks: {
           label: (context: { dataset: { label?: string }; raw: unknown }) => {
-            const value = context.raw as number
-            return `${context.dataset.label || ''}: R$ ${value.toFixed(2)}`
+            const value = context.raw as number;
+            return `${context.dataset.label || ""}: R$ ${value.toFixed(2)}`;
           },
         },
       },
@@ -250,97 +276,103 @@ export function DashboardFinanceiro() {
         },
       },
     },
-  }
+  };
 
   const totalMes = useMemo(() => {
     return Object.values(dadosPorSemana).reduce((total, semana) => {
-      return total + Object.values(semana).reduce((sum, val) => sum + val, 0)
-    }, 0)
-  }, [dadosPorSemana])
+      return total + Object.values(semana).reduce((sum, val) => sum + val, 0);
+    }, 0);
+  }, [dadosPorSemana]);
 
   const totalPorCategoria = useMemo(() => {
-    const totais: Record<string, number> = {}
+    const totais: Record<string, number> = {};
     Object.values(dadosPorSemana).forEach((semana) => {
       Object.entries(semana).forEach(([cat, valor]) => {
-        totais[cat] = (totais[cat] || 0) + valor
-      })
-    })
+        totais[cat] = (totais[cat] || 0) + valor;
+      });
+    });
     return Object.entries(totais)
       .sort((a, b) => b[1] - a[1])
-      .map(([categoria, valor]) => ({ categoria, valor }))
-  }, [dadosPorSemana])
+      .map(([categoria, valor]) => ({ categoria, valor }));
+  }, [dadosPorSemana]);
 
-  const mediaSemanal = totalMes / 4
+  const mediaSemanal = totalMes / 4;
 
   const formatarMesAno = (mesAno: string) => {
-    const [ano, mes] = mesAno.split('-')
+    const [ano, mes] = mesAno.split("-");
     const meses = [
-      'Janeiro',
-      'Fevereiro',
-      'Março',
-      'Abril',
-      'Maio',
-      'Junho',
-      'Julho',
-      'Agosto',
-      'Setembro',
-      'Outubro',
-      'Novembro',
-      'Dezembro',
-    ]
-    return `${meses[parseInt(mes) - 1]} ${ano}`
-  }
+      "Janeiro",
+      "Fevereiro",
+      "Março",
+      "Abril",
+      "Maio",
+      "Junho",
+      "Julho",
+      "Agosto",
+      "Setembro",
+      "Outubro",
+      "Novembro",
+      "Dezembro",
+    ];
+    return `${meses[parseInt(mes) - 1]} ${ano}`;
+  };
 
   useEffect(() => {
-    if (carregando) return
-    setLoadingProdutos(true)
+    if (carregando) return;
+    setLoadingProdutos(true);
     fetch(`${API_URL}/notas-fiscais/produtos`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((arr: string[]) => setListaProdutosBackend(Array.isArray(arr) ? arr : []))
+      .then((arr: string[]) =>
+        setListaProdutosBackend(Array.isArray(arr) ? arr : []),
+      )
       .catch(() => setListaProdutosBackend([]))
-      .finally(() => setLoadingProdutos(false))
-  }, [carregando])
+      .finally(() => setLoadingProdutos(false));
+  }, [carregando]);
 
   useEffect(() => {
     if (!produtoComparacao1.trim()) {
-      setSugestoesProduto2([])
-      setProdutoComparacao2('')
-      setResultadoComparacao(null)
-      return
+      setSugestoesProduto2([]);
+      setProdutoComparacao2("");
+      setResultadoComparacao(null);
+      return;
     }
-    setLoadingSugestoes(true)
-    setProdutoComparacao2('')
-    setResultadoComparacao(null)
-    const nome = encodeURIComponent(produtoComparacao1.trim())
+    setLoadingSugestoes(true);
+    setProdutoComparacao2("");
+    setResultadoComparacao(null);
+    const nome = encodeURIComponent(produtoComparacao1.trim());
     fetch(`${API_URL}/notas-fiscais/produtos/sugestoes?nome=${nome}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((arr: string[]) => setSugestoesProduto2(Array.isArray(arr) ? arr : []))
+      .then((arr: string[]) =>
+        setSugestoesProduto2(Array.isArray(arr) ? arr : []),
+      )
       .catch(() => setSugestoesProduto2([]))
-      .finally(() => setLoadingSugestoes(false))
-  }, [produtoComparacao1])
+      .finally(() => setLoadingSugestoes(false));
+  }, [produtoComparacao1]);
 
   useEffect(() => {
     if (!produtoComparacao1.trim() || !produtoComparacao2.trim()) {
-      setResultadoComparacao(null)
-      return
+      setResultadoComparacao(null);
+      return;
     }
-    setLoadingComparacao(true)
-    const p1 = encodeURIComponent(produtoComparacao1.trim())
-    const p2 = encodeURIComponent(produtoComparacao2.trim())
-    fetch(`${API_URL}/notas-fiscais/produtos/comparar-duracao?produto1=${p1}&produto2=${p2}`)
+    setLoadingComparacao(true);
+    const p1 = encodeURIComponent(produtoComparacao1.trim());
+    const p2 = encodeURIComponent(produtoComparacao2.trim());
+    fetch(
+      `${API_URL}/notas-fiscais/produtos/comparar-duracao?produto1=${p1}&produto2=${p2}`,
+    )
       .then((r) => (r.ok ? r.json() : null))
       .then(setResultadoComparacao)
       .catch(() => setResultadoComparacao(null))
-      .finally(() => setLoadingComparacao(false))
-  }, [produtoComparacao1, produtoComparacao2])
+      .finally(() => setLoadingComparacao(false));
+  }, [produtoComparacao1, produtoComparacao2]);
 
   const listaProdutosFiltrada = useMemo(() => {
-    const termo = searchProduto1.trim().toLowerCase()
-    if (!termo) return listaProdutosBackend.slice(0, 50)
+    const termo = searchProduto1.trim().toLowerCase();
+    if (!termo) return listaProdutosBackend.slice(0, 50);
     return listaProdutosBackend
       .filter((n) => n.toLowerCase().includes(termo))
-      .slice(0, 50)
-  }, [listaProdutosBackend, searchProduto1])
+      .slice(0, 50);
+  }, [listaProdutosBackend, searchProduto1]);
 
   if (carregando) {
     return (
@@ -350,7 +382,7 @@ export function DashboardFinanceiro() {
           <p className="text-gray-600">Carregando dados...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (erro) {
@@ -366,7 +398,7 @@ export function DashboardFinanceiro() {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -457,11 +489,11 @@ export function DashboardFinanceiro() {
           </h2>
           <div className="space-y-3 max-h-80 overflow-y-auto">
             {totalPorCategoria.map(({ categoria, valor }) => {
-              const cat = categorias.find((c) => c.codigo === categoria)
-              const color = cat?.cor || '#9ca3af'
+              const cat = categorias.find((c) => c.codigo === categoria);
+              const color = cat?.cor || "#9ca3af";
               const Icon =
-                ICONE_MAP[cat?.icone || 'ShoppingCart'] || ShoppingCart
-              const percentual = totalMes > 0 ? (valor / totalMes) * 100 : 0
+                ICONE_MAP[cat?.icone || "ShoppingCart"] || ShoppingCart;
+              const percentual = totalMes > 0 ? (valor / totalMes) * 100 : 0;
 
               return (
                 <div key={categoria} className="flex items-center gap-3">
@@ -491,7 +523,7 @@ export function DashboardFinanceiro() {
                     </div>
                   </div>
                 </div>
-              )
+              );
             })}
             {totalPorCategoria.length === 0 && (
               <p className="text-gray-500 text-center py-4">
@@ -508,7 +540,7 @@ export function DashboardFinanceiro() {
         </h2>
         <div className="flex flex-wrap gap-4">
           {categorias.map((cat) => {
-            const Icon = ICONE_MAP[cat.icone] || ShoppingCart
+            const Icon = ICONE_MAP[cat.icone] || ShoppingCart;
             return (
               <div
                 key={cat._id}
@@ -517,7 +549,7 @@ export function DashboardFinanceiro() {
                 <Icon className="w-4 h-4" style={{ color: cat.cor }} />
                 <span className="text-sm text-gray-700">{cat.nome}</span>
               </div>
-            )
+            );
           })}
         </div>
       </div>
@@ -541,17 +573,21 @@ export function DashboardFinanceiro() {
             </label>
             <input
               type="text"
-              value={dropdownProduto1Aberto ? searchProduto1 : produtoComparacao1}
+              value={
+                dropdownProduto1Aberto ? searchProduto1 : produtoComparacao1
+              }
               onChange={(e) => {
-                setSearchProduto1(e.target.value)
-                if (!e.target.value) setProdutoComparacao1('')
-                setDropdownProduto1Aberto(true)
+                setSearchProduto1(e.target.value);
+                if (!e.target.value) setProdutoComparacao1("");
+                setDropdownProduto1Aberto(true);
               }}
               onFocus={() => {
-                setSearchProduto1(produtoComparacao1)
-                setDropdownProduto1Aberto(true)
+                setSearchProduto1(produtoComparacao1);
+                setDropdownProduto1Aberto(true);
               }}
-              onBlur={() => setTimeout(() => setDropdownProduto1Aberto(false), 200)}
+              onBlur={() =>
+                setTimeout(() => setDropdownProduto1Aberto(false), 200)
+              }
               placeholder="Buscar produto..."
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
             />
@@ -560,7 +596,9 @@ export function DashboardFinanceiro() {
                 {loadingProdutos ? (
                   <li className="p-3 text-gray-500 text-sm">Carregando...</li>
                 ) : listaProdutosFiltrada.length === 0 ? (
-                  <li className="p-3 text-gray-500 text-sm">Nenhum produto encontrado</li>
+                  <li className="p-3 text-gray-500 text-sm">
+                    Nenhum produto encontrado
+                  </li>
                 ) : (
                   listaProdutosFiltrada.map((nome) => (
                     <li key={nome}>
@@ -568,9 +606,9 @@ export function DashboardFinanceiro() {
                         type="button"
                         className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 focus:bg-green-50 focus:outline-none"
                         onClick={() => {
-                          setProdutoComparacao1(nome)
-                          setSearchProduto1('')
-                          setDropdownProduto1Aberto(false)
+                          setProdutoComparacao1(nome);
+                          setSearchProduto1("");
+                          setDropdownProduto1Aberto(false);
                         }}
                       >
                         {nome}
@@ -593,12 +631,12 @@ export function DashboardFinanceiro() {
             >
               <option value="">
                 {!produtoComparacao1
-                  ? 'Selecione o produto 1 antes'
+                  ? "Selecione o produto 1 antes"
                   : loadingSugestoes
-                    ? 'Carregando sugestões...'
+                    ? "Carregando sugestões..."
                     : sugestoesProduto2.length === 0
-                      ? 'Nenhuma sugestão'
-                      : 'Selecione um produto'}
+                      ? "Nenhuma sugestão"
+                      : "Selecione um produto"}
               </option>
               {sugestoesProduto2.map((nome) => (
                 <option key={nome} value={nome}>
@@ -614,73 +652,75 @@ export function DashboardFinanceiro() {
         {resultadoComparacao && !loadingComparacao && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[resultadoComparacao.produto1, resultadoComparacao.produto2].map((info) => (
-                <div
-                  key={info.nome}
-                  className="border border-gray-200 rounded-lg p-4 bg-gray-50/50"
-                >
-                  <h3 className="font-medium text-gray-800 mb-2 truncate">
-                    {info.nome}
-                  </h3>
-                  <dl className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <dt className="text-gray-600">Total de compras:</dt>
-                      <dd className="font-medium text-gray-800">
-                        {info.totalCompras}
-                      </dd>
-                    </div>
-                    {info.duracaoMediaDias !== null ? (
-                      <>
-                        <div className="flex justify-between">
-                          <dt className="text-gray-600">
-                            Tempo médio entre compras:
-                          </dt>
-                          <dd className="font-medium text-green-700">
-                            {info.duracaoMediaDias} dia
-                            {info.duracaoMediaDias !== 1 ? 's' : ''}
-                          </dd>
-                        </div>
-                        {info.duracaoEntreComprasDias.length > 1 && (
-                          <div className="pt-2 mt-2 border-t border-gray-200">
-                            <dt className="text-gray-600 mb-1">
-                              Duração em cada ciclo:
+              {[resultadoComparacao.produto1, resultadoComparacao.produto2].map(
+                (info) => (
+                  <div
+                    key={info.nome}
+                    className="border border-gray-200 rounded-lg p-4 bg-gray-50/50"
+                  >
+                    <h3 className="font-medium text-gray-800 mb-2 truncate">
+                      {info.nome}
+                    </h3>
+                    <dl className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <dt className="text-gray-600">Total de compras:</dt>
+                        <dd className="font-medium text-gray-800">
+                          {info.totalCompras}
+                        </dd>
+                      </div>
+                      {info.duracaoMediaDias !== null ? (
+                        <>
+                          <div className="flex justify-between">
+                            <dt className="text-gray-600">
+                              Tempo médio entre compras:
                             </dt>
-                            <dd className="text-gray-700">
-                              {info.duracaoEntreComprasDias.join(', ')} dias
+                            <dd className="font-medium text-green-700">
+                              {info.duracaoMediaDias} dia
+                              {info.duracaoMediaDias !== 1 ? "s" : ""}
                             </dd>
                           </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-gray-500 italic">
-                        Comprado apenas 1 vez — não há como calcular duração
-                        ainda.
-                      </p>
-                    )}
-                  </dl>
-                </div>
-              ))}
+                          {info.duracaoEntreComprasDias.length > 1 && (
+                            <div className="pt-2 mt-2 border-t border-gray-200">
+                              <dt className="text-gray-600 mb-1">
+                                Duração em cada ciclo:
+                              </dt>
+                              <dd className="text-gray-700">
+                                {info.duracaoEntreComprasDias.join(", ")} dias
+                              </dd>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-gray-500 italic">
+                          Comprado apenas 1 vez — não há como calcular duração
+                          ainda.
+                        </p>
+                      )}
+                    </dl>
+                  </div>
+                ),
+              )}
             </div>
             {resultadoComparacao.produto1.duracaoMediaDias != null &&
               resultadoComparacao.produto2.duracaoMediaDias != null && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm font-medium text-green-800">
-                  {(() => {
-                    const d1 = resultadoComparacao.produto1.duracaoMediaDias
-                    const d2 = resultadoComparacao.produto2.duracaoMediaDias
-                    const diff = d1 - d2
-                    if (diff > 0)
-                      return `"${resultadoComparacao.produto1.nome}" dura em média ${diff} dias a mais entre compras que "${resultadoComparacao.produto2.nome}".`
-                    if (diff < 0)
-                      return `"${resultadoComparacao.produto2.nome}" dura em média ${Math.abs(diff)} dias a mais entre compras que "${resultadoComparacao.produto1.nome}".`
-                    return 'Os dois produtos têm o mesmo tempo médio entre compras.'
-                  })()}
-                </p>
-              </div>
-            )}
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm font-medium text-green-800">
+                    {(() => {
+                      const d1 = resultadoComparacao.produto1.duracaoMediaDias;
+                      const d2 = resultadoComparacao.produto2.duracaoMediaDias;
+                      const diff = d1 - d2;
+                      if (diff > 0)
+                        return `"${resultadoComparacao.produto1.nome}" dura em média ${diff} dias a mais entre compras que "${resultadoComparacao.produto2.nome}".`;
+                      if (diff < 0)
+                        return `"${resultadoComparacao.produto2.nome}" dura em média ${Math.abs(diff)} dias a mais entre compras que "${resultadoComparacao.produto1.nome}".`;
+                      return "Os dois produtos têm o mesmo tempo médio entre compras.";
+                    })()}
+                  </p>
+                </div>
+              )}
           </>
         )}
       </div>
     </div>
-  )
+  );
 }
