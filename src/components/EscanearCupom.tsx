@@ -1,9 +1,15 @@
 "use client";
 
 import { NotaFiscalResponse } from "@/interface/NotaFiscal/INotaFiscal";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { getAccessToken, getAuthHeaders } from "@/lib/auth-api";
+import dynamic from "next/dynamic";
+
+const Scanner = dynamic(
+  () => import("@yudiel/react-qr-scanner").then((mod) => mod.Scanner),
+  { ssr: false },
+);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -16,62 +22,6 @@ export function EscanearCupom() {
   const [processando, setProcessando] = useState(false);
   const [notaProcessada, setNotaProcessada] =
     useState<NotaFiscalResponse | null>(null);
-
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function startCamera() {
-      // Não faz sentido rodar scanner quando:
-      // - o usuário ativou o modo manual
-      // - já foi lido um QR
-      // - existe erro exibido
-      if (modoManual || !!conteudoLido || !!erro) return;
-
-      // Para (limpa) qualquer instância anterior
-      try {
-        await scannerRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
-      scannerRef.current = null;
-
-      const scanner = new Html5Qrcode("qr-reader-live", {
-        verbose: false,
-      });
-      scannerRef.current = scanner;
-
-      try {
-        await scanner.start(
-          { facingMode: "environment" },
-          undefined,
-          (decodedText) => {
-            if (cancelled) return;
-            setConteudoLido(decodedText);
-            setErro(null);
-            // Após detectar, para a câmera.
-            scanner.stop().catch(() => {});
-          },
-          () => {
-            // Erros normais de "não encontrou código" podem ocorrer enquanto
-            // a câmera analisa. Mantém silencioso.
-          },
-        );
-      } catch (e) {
-        if (cancelled) return;
-        setErro("Não foi possível acessar a câmera. Verifique permissões.");
-      }
-    }
-
-    startCamera();
-
-    return () => {
-      cancelled = true;
-      scannerRef.current?.stop().catch(() => {});
-      scannerRef.current = null;
-    };
-  }, [modoManual, conteudoLido, erro]);
 
   const recomecar = () => {
     setConteudoLido(null);
@@ -182,10 +132,23 @@ export function EscanearCupom() {
       {!conteudoLido && !modoManual && !erro && (
         <div className="flex flex-col items-center gap-6">
           <div className="w-full rounded-xl overflow-hidden border border-green-500 bg-black">
-            <div
-              id="qr-reader-live"
-              className="w-full h-72 bg-black"
-              aria-label="Área do scanner"
+            <Scanner
+              onScan={(detectedCodes) => {
+                const value = detectedCodes?.[0]?.rawValue?.trim();
+                if (!value) return;
+                setConteudoLido(value);
+                setErro(null);
+              }}
+              onError={() => {
+                setErro("Não foi possível acessar a câmera. Verifique permissões.");
+              }}
+              paused={modoManual || !!conteudoLido || !!erro}
+              constraints={{ facingMode: "environment" }}
+              components={{ finder: true }}
+              classNames={{
+                container: "w-full h-72 bg-black",
+                video: "w-full h-full object-cover",
+              }}
             />
           </div>
 

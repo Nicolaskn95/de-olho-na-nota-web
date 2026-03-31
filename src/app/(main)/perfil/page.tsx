@@ -142,8 +142,8 @@ export default function PerfilPage() {
   };
 
   return (
-    <main className="min-h-screen py-8 bg-gray-50">
-      <div className="max-w-4xl mx-auto px-6 space-y-8">
+    <main className="min-h-screen py-4 sm:py-8 bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
         <header className="text-center">
           <h1 className="text-3xl font-bold text-green-800 mb-2">Perfil</h1>
           <p className="text-gray-600">Atualize seu nome e troque sua senha</p>

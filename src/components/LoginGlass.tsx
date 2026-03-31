@@ -111,9 +111,9 @@ export function LoginGlass() {
         aria-hidden
       />
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-5xl items-center justify-center px-4 py-12">
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-5xl items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
         <div
-          className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-[40px] border border-white/30 bg-white/20 shadow-[0_25px_80px_-20px_rgba(79,70,229,0.35)] backdrop-blur-[20px] backdrop-saturate-[180%] md:flex-row md:min-h-[420px]"
+          className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl sm:rounded-[40px] border border-white/30 bg-white/20 shadow-[0_25px_80px_-20px_rgba(79,70,229,0.35)] backdrop-blur-[20px] backdrop-saturate-[180%] md:flex-row md:min-h-[420px]"
           style={{ WebkitBackdropFilter: "blur(20px) saturate(180%)" }}
         >
           <div className="absolute left-1/2 top-1/2 z-20 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/90 text-violet-600 shadow-lg md:flex">
@@ -128,7 +128,7 @@ export function LoginGlass() {
           </div>
 
           <section
-            className={`relative flex flex-1 flex-col justify-between gap-8 px-8 py-10 md:px-10 ${
+            className={`relative flex flex-1 flex-col justify-between gap-8 px-6 py-8 sm:px-8 sm:py-10 md:px-10 ${
               isLogin
                 ? "bg-gradient-to-b from-violet-100/55 to-orange-100/45"
                 : "bg-gradient-to-b from-orange-100/45 to-violet-100/55 order-2 md:order-1"
@@ -175,7 +175,7 @@ export function LoginGlass() {
           </section>
 
           <section
-            className={`relative flex flex-1 flex-col justify-center gap-6 px-8 py-10 md:px-12 ${
+            className={`relative flex flex-1 flex-col justify-center gap-6 px-6 py-8 sm:px-8 sm:py-10 md:px-12 ${
               isLogin
                 ? "bg-indigo-500/25"
                 : "bg-indigo-500/25 order-1 md:order-2"

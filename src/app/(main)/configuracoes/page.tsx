@@ -5,8 +5,8 @@ import { Estabelecimentos } from "@/components/Estabelecimentos";
 
 export default function ConfiguracoesPage() {
   return (
-    <main className="min-h-screen py-8 bg-gray-50">
-      <div className="max-w-4xl mx-auto px-6">
+    <main className="min-h-screen py-4 sm:py-8 bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
         <header className="text-center mb-10">
           <h1 className="text-3xl font-bold text-green-800 mb-2">
             Configurações
