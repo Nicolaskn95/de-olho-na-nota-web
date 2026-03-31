@@ -1,20 +1,10 @@
 "use client";
 
-import {
-  ArrowLeftRight,
-  Eye,
-  EyeOff,
-  Lock,
-  User,
-} from "lucide-react";
+import { ArrowLeftRight, Eye, EyeOff, Lock, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import {
-  loginRequest,
-  persistSession,
-  registerRequest,
-} from "@/lib/auth-api";
+import { loginRequest, persistSession, registerRequest } from "@/lib/auth-api";
 
 type Mode = "login" | "register";
 
@@ -135,7 +125,7 @@ export function LoginGlass() {
               <button
                 type="button"
                 onClick={() => setMode(isLogin ? "register" : "login")}
-                className="w-full rounded-full border border-white/40 bg-orange-200/50 px-6 py-2.5 text-sm font-medium text-[#7a3d12] shadow-sm transition hover:bg-orange-200/70 sm:w-auto sm:px-8"
+                className="w-full rounded-full border border-white/40 bg-orange-200/50 px-6 py-2.5 text-sm font-medium text-[#7a3d12] shadow-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-orange-200/70 hover:shadow-md active:scale-[0.98] sm:w-auto sm:px-8"
               >
                 {isLogin ? "Criar conta" : "Fazer login"}
               </button>
@@ -155,8 +145,16 @@ export function LoginGlass() {
               </span>
             </div>
 
-            {isLogin ? (
-              <form onSubmit={onLogin} className="mt-2 flex flex-col gap-4 sm:mt-4 sm:gap-5 md:mt-0">
+            <div className="relative mt-2 min-h-[370px] sm:mt-4 sm:min-h-[395px] md:mt-0">
+              <form
+                onSubmit={onLogin}
+                aria-hidden={!isLogin}
+                className={`absolute inset-0 flex flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-5 ${
+                  isLogin
+                    ? "translate-x-0 opacity-100"
+                    : "pointer-events-none translate-x-3 opacity-0"
+                }`}
+              >
                 <p className="text-xs font-light uppercase tracking-[0.25em] text-white/85">
                   faça login
                 </p>
@@ -192,7 +190,9 @@ export function LoginGlass() {
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-indigo-900/55 hover:bg-white/20 hover:text-indigo-950"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    aria-label={
+                      showPassword ? "Ocultar senha" : "Mostrar senha"
+                    }
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -218,23 +218,31 @@ export function LoginGlass() {
                     Esqueceu senha?
                   </button>
                 </div>
-                {error ? (
-                  <p className="text-center text-xs font-medium text-red-100" role="alert">
+                {isLogin && error ? (
+                  <p
+                    className="text-center text-xs font-medium text-red-100"
+                    role="alert"
+                  >
                     {error}
                   </p>
                 ) : null}
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full rounded-full bg-[#0f2744] py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg transition hover:bg-[#162f52] disabled:opacity-60"
+                  disabled={loading || !isLogin}
+                  className="w-full rounded-full bg-[#0f2744] py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-[#162f52] hover:shadow-xl active:scale-[0.99] disabled:translate-y-0 disabled:shadow-lg disabled:opacity-60"
                 >
-                  {loading ? "Entrando…" : "Entrar"}
+                  {loading && isLogin ? "Entrando…" : "Entrar"}
                 </button>
               </form>
-            ) : (
+
               <form
                 onSubmit={onRegister}
-                className="mt-2 flex flex-col gap-4 sm:mt-4 sm:gap-5 md:mt-0"
+                aria-hidden={isLogin}
+                className={`absolute inset-0 flex flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-5 ${
+                  isLogin
+                    ? "pointer-events-none -translate-x-3 opacity-0"
+                    : "translate-x-0 opacity-100"
+                }`}
               >
                 <p className="text-xs font-light uppercase tracking-[0.25em] text-white/85">
                   criar conta
@@ -273,7 +281,9 @@ export function LoginGlass() {
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-indigo-900/55 hover:bg-white/20 hover:text-indigo-950"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    aria-label={
+                      showPassword ? "Ocultar senha" : "Mostrar senha"
+                    }
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -309,38 +319,25 @@ export function LoginGlass() {
                     Lembrar após cadastro
                   </label>
                 </div>
-                {error ? (
-                  <p className="text-center text-xs font-medium text-red-100" role="alert">
+                {!isLogin && error ? (
+                  <p
+                    className="text-center text-xs font-medium text-red-100"
+                    role="alert"
+                  >
                     {error}
                   </p>
                 ) : null}
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full rounded-full bg-[#0f2744] py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg transition hover:bg-[#162f52] disabled:opacity-60"
+                  disabled={loading || isLogin}
+                  className="w-full rounded-full bg-[#0f2744] py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-[#162f52] hover:shadow-xl active:scale-[0.99] disabled:translate-y-0 disabled:shadow-lg disabled:opacity-60"
                 >
-                  {loading ? "Criando…" : "Criar e entrar"}
+                  {loading && !isLogin ? "Criando…" : "Criar e entrar"}
                 </button>
               </form>
-            )}
-
-            <p className="text-center text-[11px] text-white/70 md:pb-0">
-              <Link href="/" className="underline underline-offset-2 hover:text-white">
-                Voltar ao app
-              </Link>
-            </p>
+            </div>
           </section>
         </div>
-
-        <button
-          type="button"
-          onClick={toggleMode}
-          className="mt-6 flex items-center justify-center gap-2 rounded-full border border-slate-400/30 bg-white/40 px-4 py-2 text-xs font-medium text-slate-800 backdrop-blur md:hidden"
-          aria-label="Alternar entre login e cadastro"
-        >
-          <ArrowLeftRight className="h-4 w-4" />
-          {isLogin ? "Ir para cadastro" : "Ir para login"}
-        </button>
       </div>
     </div>
   );
