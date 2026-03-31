@@ -18,7 +18,7 @@ export function MainNav() {
   const items: NavItem[] = useMemo(
     () => [
       { href: "/", label: "Escanear Cupom" },
-      { href: "/dashboard", label: "Dashboard" },
+      { href: "/notasfiscais", label: "Notas Fiscais" },
       { href: "/financeiro", label: "Financeiro" },
     ],
     [],

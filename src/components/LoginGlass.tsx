@@ -31,7 +31,7 @@ export function LoginGlass() {
     try {
       const data = await loginRequest(username.trim(), password, remember);
       persistSession(data, remember);
-      router.push("/dashboard");
+      router.push("/notasfiscais");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao entrar");
     } finally {
@@ -51,7 +51,7 @@ export function LoginGlass() {
       await registerRequest(username.trim(), password);
       const data = await loginRequest(username.trim(), password, remember);
       persistSession(data, remember);
-      router.push("/dashboard");
+      router.push("/notasfiscais");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao criar conta");
     } finally {

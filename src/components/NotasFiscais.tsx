@@ -172,6 +172,8 @@ export function NotasFiscais() {
     return data.toLocaleDateString("pt-BR");
   };
 
+  const formatarUnidade = (unidade?: string) => unidade?.toUpperCase() || "";
+
   const produtosAgrupadosPorNome = useMemo(() => {
     const mapa = new Map<string, ProdutoAgrupado>();
     for (const nota of notas) {
@@ -230,7 +232,9 @@ export function NotasFiscais() {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <header className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-green-800 mb-2">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-green-800 mb-2">
+            Notas Fiscais
+          </h1>
           <p className="text-gray-600">Acompanhe seus gastos mensais</p>
         </header>
         <div className="bg-gray-50 text-gray-600 p-12 rounded-lg text-center">
@@ -277,7 +281,7 @@ export function NotasFiscais() {
           onClick={() => setModalProdutosAberto(true)}
           className="px-4 py-2 bg-green-800 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
         >
-          Agrupar os produtos
+          Procurar todos os produtos
         </button>
       </div>
 
@@ -385,13 +389,14 @@ export function NotasFiscais() {
                                   >
                                     {categoria?.nome || "Outros"}
                                   </span>
-                                  {produto.unidade?.toUpperCase() === "KG" && (
+                                  {formatarUnidade(produto.unidade) === "KG" && (
                                     <span className="text-xs text-gray-500 whitespace-nowrap">
-                                      {formatarMoeda(produto.valorUnitario)}/kg
+                                      Preço/kg:{" "}
+                                      {formatarMoeda(produto.valorUnitario)}
                                     </span>
                                   )}
                                   <span className="text-gray-800 font-medium whitespace-nowrap">
-                                    {formatarMoeda(produto.valorTotal)}
+                                    Total: {formatarMoeda(produto.valorTotal)}
                                   </span>
                                 </div>
                               </li>
