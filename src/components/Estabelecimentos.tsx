@@ -1,6 +1,7 @@
 'use client'
 
 import { EstabelecimentoItem } from '@/interface/Estabelecimento/IEstabelecimento'
+import { getAccessToken, getAuthHeaders } from '@/lib/auth-api'
 import { useState, useEffect } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -18,7 +19,11 @@ export function Estabelecimentos() {
     setCarregando(true)
     setErro(null)
     try {
-      const res = await fetch(`${API_URL}/notas-fiscais/estabelecimentos`)
+      const token = getAccessToken()
+      if (!token) throw new Error('Faça login novamente.')
+      const res = await fetch(`${API_URL}/notas-fiscais/estabelecimentos`, {
+        headers: { ...getAuthHeaders() },
+      })
       if (!res.ok) throw new Error('Erro ao carregar estabelecimentos')
       const data = await res.json()
       setLista(data)
@@ -33,9 +38,12 @@ export function Estabelecimentos() {
     carregar()
   }, [])
 
+  const nomeExibicaoAtual = (item: EstabelecimentoItem) =>
+    item.nomeDepara?.trim() || item.nomeOriginal || ''
+
   const abrirEdicao = (item: EstabelecimentoItem) => {
     setEditando(item)
-    setNomeEditado(item.estabelecimento)
+    setNomeEditado(nomeExibicaoAtual(item))
     setErro(null)
     setSucesso(null)
   }
@@ -55,8 +63,11 @@ export function Estabelecimentos() {
         `${API_URL}/notas-fiscais/estabelecimentos/${cnpjEncoded}`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ estabelecimento: nomeEditado.trim() }),
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({ nomeDepara: nomeEditado.trim() }),
         },
       )
       if (!res.ok) {
@@ -67,12 +78,16 @@ export function Estabelecimentos() {
       setLista((prev) =>
         prev.map((e) =>
           e.cnpj === editando.cnpj
-            ? { ...e, estabelecimento: result.estabelecimento }
+            ? {
+                ...e,
+                nomeDepara: result.nomeDepara,
+                nomeOriginal: result.nomeOriginal ?? e.nomeOriginal,
+              }
             : e,
         ),
       )
       setSucesso(
-        `Nome atualizado. ${result.notasAtualizadas} nota(s) atualizada(s).`,
+        `De-para salvo. ${result.notasAtualizadas} nota(s) passam a exibir o novo nome.`,
       )
       fecharEdicao()
     } catch (e) {
@@ -93,12 +108,10 @@ export function Estabelecimentos() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-800">
-        Estabelecimentos (por CNPJ)
-      </h2>
       <p className="text-sm text-gray-600">
-        Lista de CNPJs das notas cadastradas. Edite o nome do estabelecimento
-        para padronizar em todas as notas do mesmo CNPJ.
+        Para cada CNPJ você vê o nome como veio na nota (ligado ao CNPJ) e pode
+        cadastrar como prefere chamar o lugar. Salvamos o nome original e o
+        de-para; as notas passam a exibir o nome que você escolheu.
       </p>
 
       {erro && (
@@ -129,17 +142,24 @@ export function Estabelecimentos() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              Editar estabelecimento
+              Nome de exibição (de-para)
             </h3>
-            <p className="text-sm text-gray-500 mb-4 font-mono">
+            <p className="text-sm text-gray-500 mb-2 font-mono">
               CNPJ: {editando.cnpj}
             </p>
+            <p className="text-xs text-gray-500 mb-3">
+              <span className="font-medium text-gray-600">Na nota (CNPJ):</span>{' '}
+              {editando.nomeOriginal || '—'}
+            </p>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Como você quer chamar este lugar
+            </label>
             <input
               type="text"
               value={nomeEditado}
               onChange={(e) => setNomeEditado(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 mb-4"
-              placeholder="Nome do estabelecimento"
+              placeholder="Ex.: Mercado do bairro"
             />
             <div className="flex gap-3 justify-end">
               <button
@@ -175,7 +195,16 @@ export function Estabelecimentos() {
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-sm text-gray-500">{item.cnpj}</p>
                 <p className="font-medium text-gray-800 truncate">
-                  {item.estabelecimento || '—'}
+                  {nomeExibicaoAtual(item) || '—'}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  Na nota: {item.nomeOriginal || '—'}
+                  {item.nomeDepara ? (
+                    <span className="text-gray-400">
+                      {' '}
+                      · De-para: {item.nomeDepara}
+                    </span>
+                  ) : null}
                 </p>
                 <p className="text-xs text-gray-400">
                   {item.totalNotas} nota(s)
@@ -183,9 +212,9 @@ export function Estabelecimentos() {
               </div>
               <button
                 onClick={() => abrirEdicao(item)}
-                className="px-3 py-1.5 text-sm border border-green-700 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
+                className="px-3 py-1.5 text-sm border border-green-700 text-green-700 rounded-lg hover:bg-green-50 transition-colors shrink-0"
               >
-                Editar nome
+                Definir de-para
               </button>
             </li>
           ))}
