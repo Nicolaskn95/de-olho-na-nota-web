@@ -5,10 +5,11 @@ import { useMemo, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { getAccessToken, getAuthHeaders } from '@/lib/auth-api'
 import dynamic from 'next/dynamic'
-import Joyride, {
+import {
   ACTIONS,
-  CallBackProps,
+  EventData,
   EVENTS,
+  Joyride,
   STATUS,
   Step,
 } from 'react-joyride'
@@ -120,7 +121,7 @@ export function EscanearCupom() {
     setRodandoTour(true)
   }
 
-  const onJoyrideCallback = (data: CallBackProps) => {
+  const onJoyrideCallback = (data: EventData) => {
     const { action, index, status, type } = data
 
     if (
@@ -285,11 +286,9 @@ export function EscanearCupom() {
         run={rodandoTour}
         steps={passosTour}
         stepIndex={passoTour}
-        callback={onJoyrideCallback}
+        onEvent={onJoyrideCallback}
         continuous
-        showSkipButton
         scrollToFirstStep
-        disableScrolling
         locale={{
           back: 'Voltar',
           close: 'Fechar',
@@ -297,11 +296,11 @@ export function EscanearCupom() {
           next: 'Proximo',
           skip: 'Pular',
         }}
-        styles={{
-          options: {
-            primaryColor: '#166534',
-            zIndex: 10000,
-          },
+        options={{
+          buttons: ['back', 'close', 'primary', 'skip'],
+          primaryColor: '#166534',
+          skipScroll: true,
+          zIndex: 10000,
         }}
       />
       <div id="qr-reader-hidden" className="hidden" aria-hidden="true" />
