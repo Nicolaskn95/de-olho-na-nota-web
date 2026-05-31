@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAccessToken } from "@/lib/auth-api";
+import { clearSession, getAccessToken } from "@/lib/auth-api";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -11,6 +11,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
+      clearSession();
       router.replace("/login");
       return;
     }

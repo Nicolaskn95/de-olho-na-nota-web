@@ -3,8 +3,13 @@
 import { ArrowLeftRight, Eye, EyeOff, Lock, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
-import { loginRequest, persistSession, registerRequest } from "@/lib/auth-api";
+import { FormEvent, useEffect, useState } from "react";
+import {
+  getAccessToken,
+  loginRequest,
+  persistSession,
+  registerRequest,
+} from "@/lib/auth-api";
 
 type Mode = "login" | "register";
 
@@ -18,6 +23,15 @@ export function LoginGlass() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      router.replace("/notasfiscais");
+      return;
+    }
+    setCheckingSession(false);
+  }, [router]);
 
   const toggleMode = () => {
     setMode((m) => (m === "login" ? "register" : "login"));
@@ -60,6 +74,14 @@ export function LoginGlass() {
   }
 
   const isLogin = mode === "login";
+
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#e8e4f5]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#e8e4f5] text-slate-900">

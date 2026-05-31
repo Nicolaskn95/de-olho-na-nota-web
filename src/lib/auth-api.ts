@@ -59,10 +59,24 @@ export async function registerRequest(
   return res.json() as Promise<{ id: string; username: string }>;
 }
 
+function normalizeToken(token: string | null): string | null {
+  if (!token || token === "undefined" || token === "null") {
+    return null;
+  }
+  return token;
+}
+
 export function persistSession(
   data: LoginResponse,
   remember: boolean,
 ): void {
+  if (!data.accessToken?.trim()) {
+    throw new Error("Resposta de login inválida: token ausente");
+  }
+  if (!data.user?.id || !data.user?.username) {
+    throw new Error("Resposta de login inválida: usuário ausente");
+  }
+
   try {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
@@ -79,9 +93,9 @@ export function persistSession(
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return (
+    return normalizeToken(
       localStorage.getItem("auth_token") ||
-      sessionStorage.getItem("auth_token")
+        sessionStorage.getItem("auth_token"),
     );
   } catch {
     return null;
