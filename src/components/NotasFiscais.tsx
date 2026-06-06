@@ -37,7 +37,9 @@ export function NotasFiscais() {
         fetch(`${API_URL}/notas-fiscais`, {
           headers: getAuthHeaders(),
         }),
-        fetch(`${API_URL}/categorias/prefixos/listar`),
+        fetch(`${API_URL}/categorias/prefixos/listar`, {
+          headers: getAuthHeaders(),
+        }),
       ]);
 
       if (!notasRes.ok) {

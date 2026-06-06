@@ -137,7 +137,9 @@ export function DashboardFinanceiro() {
         fetch(`${API_URL}/notas-fiscais`, {
           headers: getAuthHeaders(),
         }),
-        fetch(`${API_URL}/categorias/prefixos/listar`),
+        fetch(`${API_URL}/categorias/prefixos/listar`, {
+          headers: getAuthHeaders(),
+        }),
         fetch(`${API_URL}/categorias`),
       ]);
 

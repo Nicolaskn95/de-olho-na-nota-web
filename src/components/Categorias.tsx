@@ -1,13 +1,124 @@
 'use client'
 
-import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
-import { useState, useEffect, useCallback } from 'react'
+import {
+  Categoria,
+  CsvPreviewRow,
+  ImportarPrefixosResult,
+  Prefixo,
+} from '@/interface/Prefixo/IPrefixo'
+import { getAuthHeaders } from '@/lib/auth-api'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface CategoriasProps {
   /** Quando true, oculta o título principal (uso dentro de Configurações) */
   compact?: boolean
+}
+
+function limparCelulaCsv(valor: string): string {
+  return valor.replace(/^\uFEFF/, '').trim()
+}
+
+function parseCsvLinhas(texto: string): string[][] {
+  return texto
+    .split(/\r?\n/)
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+    .map((linha) =>
+      linha.split(',').map((celula) => limparCelulaCsv(celula)),
+    )
+}
+
+function validarCsv(
+  linhas: string[][],
+  codigosValidos: Set<string>,
+): CsvPreviewRow[] {
+  if (linhas.length === 0) return []
+
+  const header = linhas[0].map((c) => c.toLowerCase())
+  const idxPrefixo = header.indexOf('prefixo')
+  const idxCodigo = header.indexOf('codigo_categoria')
+
+  if (idxPrefixo === -1 || idxCodigo === -1) {
+    return [
+      {
+        linha: 1,
+        prefixo: '',
+        codigoCategoria: '',
+        status: 'erro',
+        motivo: 'Cabeçalho inválido. Use: prefixo,codigo_categoria',
+      },
+    ]
+  }
+
+  const preview: CsvPreviewRow[] = []
+  const vistos = new Set<string>()
+
+  for (let i = 1; i < linhas.length; i++) {
+    const linha = linhas[i]
+    const prefixoRaw = linha[idxPrefixo] ?? ''
+    const codigoRaw = linha[idxCodigo] ?? ''
+    const prefixo = prefixoRaw.toUpperCase().trim()
+    const codigoCategoria = codigoRaw.toUpperCase().trim()
+    const numLinha = i + 1
+
+    if (!prefixo && !codigoCategoria) continue
+
+    if (prefixo.length < 2) {
+      preview.push({
+        linha: numLinha,
+        prefixo,
+        codigoCategoria,
+        status: 'erro',
+        motivo: 'Prefixo deve ter no mínimo 2 caracteres',
+      })
+      continue
+    }
+
+    if (!codigoCategoria) {
+      preview.push({
+        linha: numLinha,
+        prefixo,
+        codigoCategoria,
+        status: 'erro',
+        motivo: 'codigo_categoria é obrigatório',
+      })
+      continue
+    }
+
+    if (!codigosValidos.has(codigoCategoria)) {
+      preview.push({
+        linha: numLinha,
+        prefixo,
+        codigoCategoria,
+        status: 'erro',
+        motivo: `Código "${codigoCategoria}" não existe`,
+      })
+      continue
+    }
+
+    if (vistos.has(prefixo)) {
+      preview.push({
+        linha: numLinha,
+        prefixo,
+        codigoCategoria,
+        status: 'erro',
+        motivo: 'Prefixo duplicado no arquivo',
+      })
+      continue
+    }
+
+    vistos.add(prefixo)
+    preview.push({
+      linha: numLinha,
+      prefixo,
+      codigoCategoria,
+      status: 'ok',
+    })
+  }
+
+  return preview
 }
 
 export function Categorias({ compact }: CategoriasProps) {
@@ -22,33 +133,63 @@ export function Categorias({ compact }: CategoriasProps) {
   const [editando, setEditando] = useState<Prefixo | null>(null)
   const [editPrefixo, setEditPrefixo] = useState('')
   const [editCategoria, setEditCategoria] = useState('')
+  const [mostrarCodigos, setMostrarCodigos] = useState(false)
+  const [previewCsv, setPreviewCsv] = useState<CsvPreviewRow[]>([])
+  const [nomeArquivoCsv, setNomeArquivoCsv] = useState<string | null>(null)
+  const [importando, setImportando] = useState(false)
+  const categoriasRef = useRef<Categoria[]>([])
+
+  useEffect(() => {
+    categoriasRef.current = categorias
+  }, [categorias])
+
+  const carregarPrefixos = useCallback(async () => {
+    const prefixosRes = await fetch(`${API_URL}/categorias/prefixos/listar`, {
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    })
+
+    if (!prefixosRes.ok) {
+      if (prefixosRes.status === 401) {
+        setErro('Faça login para gerenciar seus prefixos.')
+      } else {
+        setErro('Erro ao carregar prefixos.')
+      }
+      return false
+    }
+
+    setPrefixos((await prefixosRes.json()) as Prefixo[])
+    setErro(null)
+    return true
+  }, [])
 
   const carregarDados = useCallback(async () => {
     try {
-      const [categoriasRes, prefixosRes] = await Promise.all([
-        fetch(`${API_URL}/categorias`),
-        fetch(`${API_URL}/categorias/prefixos/listar`),
-      ])
-
-      if (!categoriasRes.ok || !prefixosRes.ok) {
-        throw new Error('Erro ao carregar dados')
+      const categoriasRes = await fetch(`${API_URL}/categorias`, {
+        cache: 'no-store',
+      })
+      if (!categoriasRes.ok) {
+        throw new Error('Erro ao carregar categorias')
       }
 
-      const categoriasData = await categoriasRes.json()
-      const prefixosData = await prefixosRes.json()
-
+      const categoriasData = (await categoriasRes.json()) as Categoria[]
       setCategorias(categoriasData)
-      setPrefixos(prefixosData)
+      categoriasRef.current = categoriasData
 
       if (categoriasData.length > 0 && !categoriaSelecionada) {
         setCategoriaSelecionada(categoriasData[0]._id)
+      }
+
+      const prefixosOk = await carregarPrefixos()
+      if (!prefixosOk) {
+        setPrefixos([])
       }
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido')
     } finally {
       setCarregando(false)
     }
-  }, [categoriaSelecionada])
+  }, [categoriaSelecionada, carregarPrefixos])
 
   useEffect(() => {
     carregarDados()
@@ -66,7 +207,10 @@ export function Categorias({ compact }: CategoriasProps) {
     try {
       const response = await fetch(`${API_URL}/categorias/prefixos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({
           prefixo: novoPrefixo.trim(),
           categoriaId: categoriaSelecionada,
@@ -101,6 +245,7 @@ export function Categorias({ compact }: CategoriasProps) {
     try {
       const response = await fetch(`${API_URL}/categorias/prefixos/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       })
 
       if (!response.ok) {
@@ -139,7 +284,10 @@ export function Categorias({ compact }: CategoriasProps) {
         `${API_URL}/categorias/prefixos/${editando._id}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+          },
           body: JSON.stringify({
             prefixo: editPrefixo.trim(),
             categoriaId: editCategoria,
@@ -166,6 +314,102 @@ export function Categorias({ compact }: CategoriasProps) {
       setErro(e instanceof Error ? e.message : 'Erro ao atualizar prefixo')
     } finally {
       setSalvando(false)
+    }
+  }
+
+  const handleArquivoCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivo = e.target.files?.[0]
+    if (!arquivo) return
+
+    setErro(null)
+    setSucesso(null)
+    setNomeArquivoCsv(arquivo.name)
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const texto = event.target?.result as string
+      const linhas = parseCsvLinhas(texto)
+      const cats = categoriasRef.current
+
+      if (cats.length === 0) {
+        setPreviewCsv([
+          {
+            linha: 1,
+            prefixo: '',
+            codigoCategoria: '',
+            status: 'erro',
+            motivo:
+              'Categorias ainda não carregadas. Aguarde ou recarregue a página.',
+          },
+        ])
+        return
+      }
+
+      const codigos = new Set(
+        cats.map((c) => c.codigo.toUpperCase()).filter(Boolean),
+      )
+      setPreviewCsv(validarCsv(linhas, codigos))
+    }
+    reader.readAsText(arquivo, 'UTF-8')
+    e.target.value = ''
+  }
+
+  const linhasValidas = previewCsv.filter((r) => r.status === 'ok')
+  const linhasComErro = previewCsv.filter((r) => r.status === 'erro')
+
+  const importarCsv = async () => {
+    if (linhasValidas.length === 0 || linhasComErro.length > 0) return
+
+    setImportando(true)
+    setErro(null)
+    setSucesso(null)
+
+    try {
+      const response = await fetch(`${API_URL}/categorias/prefixos/importar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          prefixos: linhasValidas.map((r) => ({
+            prefixo: r.prefixo,
+            codigoCategoria: r.codigoCategoria,
+          })),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      const resultado = (await response.json()) as ImportarPrefixosResult
+
+      const partes = [
+        `${resultado.criados} criado(s)`,
+        resultado.ignorados > 0
+          ? `${resultado.ignorados} ignorado(s) (já existiam)`
+          : null,
+        resultado.erros.length > 0
+          ? `${resultado.erros.length} erro(s) no servidor`
+          : null,
+      ].filter(Boolean)
+
+      setSucesso(`Importação concluída: ${partes.join(', ')}.`)
+      setPreviewCsv([])
+      setNomeArquivoCsv(null)
+
+      if (Array.isArray(resultado.prefixos)) {
+        setPrefixos(resultado.prefixos)
+        setErro(null)
+      } else {
+        await carregarPrefixos()
+      }
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao importar prefixos')
+    } finally {
+      setImportando(false)
     }
   }
 
@@ -288,6 +532,133 @@ export function Categorias({ compact }: CategoriasProps) {
       )}
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">
+          Importar prefixos via CSV
+        </h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Use o template com as colunas{' '}
+          <code className="bg-gray-100 px-1 rounded">prefixo</code> e{' '}
+          <code className="bg-gray-100 px-1 rounded">codigo_categoria</code>.
+          O prefixo deve ser o início do nome do produto (mínimo 2 caracteres).
+          Duplicatas já cadastradas serão ignoradas.
+        </p>
+
+        <div className="flex flex-wrap gap-3 mb-4">
+          <a
+            href="/templates/prefixos-categorias.csv"
+            download="prefixos-categorias.csv"
+            className="px-4 py-2 border border-green-800 text-green-800 rounded-lg hover:bg-green-50 transition-colors text-sm font-medium"
+          >
+            Baixar template CSV
+          </a>
+          <button
+            type="button"
+            onClick={() => setMostrarCodigos((v) => !v)}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          >
+            {mostrarCodigos ? 'Ocultar' : 'Ver'} códigos de categoria
+          </button>
+        </div>
+
+        {mostrarCodigos && (
+          <div className="mb-4 overflow-x-auto border border-gray-200 rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left p-2 font-medium text-gray-700">
+                    codigo_categoria
+                  </th>
+                  <th className="text-left p-2 font-medium text-gray-700">
+                    Nome
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {categorias.map((cat) => (
+                  <tr key={cat._id} className="border-t border-gray-100">
+                    <td className="p-2 font-mono text-xs text-gray-800">
+                      {cat.codigo}
+                    </td>
+                    <td className="p-2 text-gray-600">{cat.nome}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <label className="block text-sm text-gray-600 mb-1">
+            Selecionar arquivo .csv
+          </label>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleArquivoCsv}
+            className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-800 file:text-white file:cursor-pointer hover:file:bg-green-700"
+          />
+          {nomeArquivoCsv && (
+            <p className="text-xs text-gray-500 mt-1">Arquivo: {nomeArquivoCsv}</p>
+          )}
+        </div>
+
+        {previewCsv.length > 0 && (
+          <div className="space-y-4">
+            <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-64 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="text-left p-2">Linha</th>
+                    <th className="text-left p-2">Prefixo</th>
+                    <th className="text-left p-2">Código categoria</th>
+                    <th className="text-left p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewCsv.map((row) => (
+                    <tr
+                      key={`${row.linha}-${row.prefixo}`}
+                      className="border-t border-gray-100"
+                    >
+                      <td className="p-2 text-gray-500">{row.linha}</td>
+                      <td className="p-2 font-mono">{row.prefixo || '—'}</td>
+                      <td className="p-2 font-mono text-xs">
+                        {row.codigoCategoria || '—'}
+                      </td>
+                      <td className="p-2">
+                        {row.status === 'ok' ? (
+                          <span className="text-green-700">OK</span>
+                        ) : (
+                          <span className="text-red-600" title={row.motivo}>
+                            Erro: {row.motivo}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <button
+              type="button"
+              onClick={importarCsv}
+              disabled={
+                importando ||
+                linhasValidas.length === 0 ||
+                linhasComErro.length > 0
+              }
+              className="px-6 py-3 bg-green-800 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {importando
+                ? 'Importando...'
+                : `Importar ${linhasValidas.length} prefixo(s)`}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-8 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">
           Cadastrar Novo Prefixo
         </h2>
@@ -350,7 +721,7 @@ export function Categorias({ compact }: CategoriasProps) {
 
         {prefixos.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
-            Nenhum prefixo cadastrado ainda
+            Nenhum prefixo cadastrado ainda. Importe um CSV ou cadastre manualmente.
           </p>
         ) : (
           <div className="space-y-6">
