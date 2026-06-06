@@ -66,6 +66,18 @@ function normalizeToken(token: string | null): string | null {
   return token;
 }
 
+function clearStoredSession(): void {
+  try {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    localStorage.removeItem("auth_remember");
+    sessionStorage.removeItem("auth_token");
+    sessionStorage.removeItem("auth_user");
+  } catch {
+    /* ignore */
+  }
+}
+
 export function persistSession(
   data: LoginResponse,
   remember: boolean,
@@ -77,17 +89,28 @@ export function persistSession(
     throw new Error("Resposta de login inválida: usuário ausente");
   }
 
+  clearStoredSession();
+
+  // sessionStorage is cleared aggressively on mobile Safari when the tab/app
+  // is closed; localStorage survives. "remember" still controls JWT expiry (7d vs 1d).
   try {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
-    sessionStorage.removeItem("auth_token");
-    sessionStorage.removeItem("auth_user");
+    localStorage.setItem("auth_token", data.accessToken);
+    localStorage.setItem("auth_user", JSON.stringify(data.user));
+    localStorage.setItem("auth_remember", remember ? "1" : "0");
   } catch {
-    /* ignore */
+    throw new Error(
+      "Não foi possível salvar a sessão. Verifique se cookies/dados do site não estão bloqueados.",
+    );
   }
-  const storage = remember ? localStorage : sessionStorage;
-  storage.setItem("auth_token", data.accessToken);
-  storage.setItem("auth_user", JSON.stringify(data.user));
+}
+
+export function getRememberPreference(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return localStorage.getItem("auth_remember") !== "0";
+  } catch {
+    return true;
+  }
 }
 
 export function getAccessToken(): string | null {
@@ -121,12 +144,5 @@ export function getAuthUser(): AuthUser | null {
 }
 
 export function clearSession(): void {
-  try {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
-    sessionStorage.removeItem("auth_token");
-    sessionStorage.removeItem("auth_user");
-  } catch {
-    /* ignore */
-  }
+  clearStoredSession();
 }

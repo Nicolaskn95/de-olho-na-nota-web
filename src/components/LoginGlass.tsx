@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import {
   getAccessToken,
+  getRememberPreference,
   loginRequest,
   persistSession,
   registerRequest,
@@ -20,18 +21,25 @@ export function LoginGlass() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [remember, setRemember] = useState(true);
+  const [rememberReady, setRememberReady] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
+    setRemember(getRememberPreference());
+    setRememberReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!rememberReady) return;
     if (getAccessToken()) {
       router.replace("/notasfiscais");
       return;
     }
     setCheckingSession(false);
-  }, [router]);
+  }, [router, rememberReady]);
 
   const toggleMode = () => {
     setMode((m) => (m === "login" ? "register" : "login"));
@@ -173,8 +181,8 @@ export function LoginGlass() {
                 aria-hidden={!isLogin}
                 className={`absolute inset-0 flex flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-5 ${
                   isLogin
-                    ? "translate-x-0 opacity-100"
-                    : "pointer-events-none translate-x-3 opacity-0"
+                    ? "z-10 translate-x-0 opacity-100"
+                    : "pointer-events-none z-0 translate-x-3 opacity-0"
                 }`}
               >
                 <p className="text-xs font-light uppercase tracking-[0.25em] text-white/85">
@@ -224,12 +232,12 @@ export function LoginGlass() {
                   </button>
                 </label>
                 <div className="flex items-center justify-between gap-4 text-xs text-white/90">
-                  <label className="flex cursor-pointer items-center gap-2">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 py-1">
                     <input
                       type="checkbox"
                       checked={remember}
                       onChange={(e) => setRemember(e.target.checked)}
-                      className="h-4 w-4 rounded border-white/60 bg-white/30 text-indigo-700 focus:ring-indigo-300"
+                      className="h-5 w-5 shrink-0 rounded border-white/60 bg-white/30 text-indigo-700 focus:ring-indigo-300"
                     />
                     Lembrar
                   </label>
@@ -262,8 +270,8 @@ export function LoginGlass() {
                 aria-hidden={isLogin}
                 className={`absolute inset-0 flex flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-5 ${
                   isLogin
-                    ? "pointer-events-none -translate-x-3 opacity-0"
-                    : "translate-x-0 opacity-100"
+                    ? "pointer-events-none z-0 -translate-x-3 opacity-0"
+                    : "z-10 translate-x-0 opacity-100"
                 }`}
               >
                 <p className="text-xs font-light uppercase tracking-[0.25em] text-white/85">
@@ -331,12 +339,12 @@ export function LoginGlass() {
                   />
                 </label>
                 <div className="flex items-center gap-2 text-xs text-white/90">
-                  <label className="flex cursor-pointer items-center gap-2">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 py-1">
                     <input
                       type="checkbox"
                       checked={remember}
                       onChange={(e) => setRemember(e.target.checked)}
-                      className="h-4 w-4 rounded border-white/60 bg-white/30 text-indigo-700 focus:ring-indigo-300"
+                      className="h-5 w-5 shrink-0 rounded border-white/60 bg-white/30 text-indigo-700 focus:ring-indigo-300"
                     />
                     Lembrar após cadastro
                   </label>
