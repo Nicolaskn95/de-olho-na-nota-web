@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { Categoria, Prefixo } from "@/interface/Prefixo/IPrefixo";
 import { NotaFiscal } from "@/interface/NotaFiscal/INotaFiscal";
+import { DuracaoMedia } from "./DuracaoMedia";
 
 ChartJS.register(
   CategoryScale,
@@ -96,6 +97,7 @@ export function DashboardFinanceiro() {
     return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
   });
   const [carregando, setCarregando] = useState(true);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'duracao'>('dashboard');
   const [erro, setErro] = useState<string | null>(null);
   const [produtoComparacao1, setProdutoComparacao1] = useState("");
   const [produtoComparacao2, setProdutoComparacao2] = useState("");
@@ -414,6 +416,35 @@ export function DashboardFinanceiro() {
         </p>
       </header>
 
+      {/* Tab bar */}
+      <div className="mb-8 overflow-x-auto">
+        <div className="inline-flex bg-gray-100 rounded-xl p-1 min-w-fit">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
+              activeTab === 'dashboard'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab('duracao')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
+              activeTab === 'duracao'
+                ? 'bg-green-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Duração Média
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'dashboard' && (<>
       <div className="flex flex-wrap gap-4 mb-8 items-center">
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-gray-500" />
@@ -723,6 +754,9 @@ export function DashboardFinanceiro() {
           </>
         )}
       </div>
+      </>)}
+
+      {activeTab === 'duracao' && <DuracaoMedia />}
     </div>
   );
 }
