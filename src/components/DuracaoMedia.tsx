@@ -34,14 +34,16 @@ export function DuracaoMedia() {
   const [step, setStep] = useState<1 | 2>(1);
 
   // Step 1 form state
-  const [mesInicial, setMesInicial] = useState(() => {
-    const hoje = new Date();
-    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [mesInicial, setMesInicial] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [qtdMeses, setQtdMeses] = useState(3);
   const [categorias, setCategorias] = useState<CategoriaOption[]>([]);
+  const [prefixos, setPrefixos] = useState<any[]>([]);
+  const [mesesDisponiveis, setMesesDisponiveis] = useState<string[]>([]);
+  
   const [loadingCategorias, setLoadingCategorias] = useState(true);
+  const [loadingNotas, setLoadingNotas] = useState(true);
+  const [loadingPrefixos, setLoadingPrefixos] = useState(true);
   const [loadingFiltrar, setLoadingFiltrar] = useState(false);
 
   // Step 2 state
@@ -59,9 +61,10 @@ export function DuracaoMedia() {
   // Error state
   const [erro, setErro] = useState<string | null>(null);
 
-  // Load categories on mount
+  // Load data on mount
   useEffect(() => {
-    const loadCategorias = async () => {
+    const loadInitialData = async () => {
+      // 1. Load categories
       try {
         const res = await fetch(`${API_URL}/categorias`, {
           headers: getAuthHeaders(),
@@ -72,13 +75,61 @@ export function DuracaoMedia() {
         if (data.length > 0 && !categoriaId) {
           setCategoriaId(data[0]._id);
         }
-      } catch {
+      } catch (e) {
+        console.error(e);
         setErro("Não foi possível carregar as categorias.");
       } finally {
         setLoadingCategorias(false);
       }
+
+      // 2. Load prefixos
+      try {
+        const res = await fetch(`${API_URL}/categorias/prefixos/listar`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPrefixos(data);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingPrefixos(false);
+      }
+
+      // 3. Load notas to extract months
+      try {
+        const res = await fetch(`${API_URL}/notas-fiscais`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const meses = new Set<string>();
+          data.forEach((nota: any) => {
+            if (nota.dataEmissao) {
+              const date = new Date(nota.dataEmissao);
+              const mesAno = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+              meses.add(mesAno);
+            }
+          });
+          const mesesOrdenados = Array.from(meses).sort().reverse();
+          setMesesDisponiveis(mesesOrdenados);
+          if (mesesOrdenados.length > 0) {
+            setMesInicial(mesesOrdenados[0]);
+          } else {
+            // Fallback to current calendar month
+            const hoje = new Date();
+            setMesInicial(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingNotas(false);
+      }
     };
-    loadCategorias();
+
+    loadInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -93,6 +144,10 @@ export function DuracaoMedia() {
   }, [resultado]);
 
   const handleFiltrar = async () => {
+    if (!mesInicial) {
+      setErro("Nenhum mês de partida disponível. Certifique-se de ter notas fiscais escaneadas.");
+      return;
+    }
     setErro(null);
     setLoadingFiltrar(true);
     try {
@@ -183,6 +238,26 @@ export function DuracaoMedia() {
     });
   };
 
+  const formatarLabelMes = (mesAno: string) => {
+    if (!mesAno) return "";
+    const [ano, mes] = mesAno.split("-");
+    const meses = [
+      "Janeiro",
+      "Fevereiro",
+      "Março",
+      "Abril",
+      "Maio",
+      "Junho",
+      "Julho",
+      "Agosto",
+      "Setembro",
+      "Outubro",
+      "Novembro",
+      "Dezembro",
+    ];
+    return `${meses[parseInt(mes) - 1]} ${ano}`;
+  };
+
   const formatCurrency = (value: number) => {
     return value.toLocaleString("pt-BR", {
       style: "currency",
@@ -264,12 +339,30 @@ export function DuracaoMedia() {
                 <Calendar className="w-4 h-4 inline mr-1" />
                 Mês/Ano Inicial
               </label>
-              <input
-                type="month"
-                value={mesInicial}
-                onChange={(e) => setMesInicial(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              />
+              {loadingNotas ? (
+                <div className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 text-sm">
+                  Carregando meses...
+                </div>
+              ) : mesesDisponiveis.length === 0 ? (
+                <div className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 text-sm">
+                  Nenhuma nota cadastrada
+                </div>
+              ) : (
+                <div className="relative">
+                  <select
+                    value={mesInicial}
+                    onChange={(e) => setMesInicial(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 appearance-none bg-white"
+                  >
+                    {mesesDisponiveis.map((mes) => (
+                      <option key={mes} value={mes}>
+                        {formatarLabelMes(mes)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              )}
             </div>
 
             {/* Categoria */}
@@ -377,11 +470,30 @@ export function DuracaoMedia() {
             <div className="bg-white border border-gray-200 rounded-xl p-12 shadow-sm text-center">
               <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600 font-medium">
-                Nenhuma nota fiscal encontrada para os critérios selecionados.
+                Nenhuma nota fiscal encontrada no período selecionado.
               </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Tente alterar o período ou a categoria.
-              </p>
+              
+              {prefixos.filter(p => p.categoria?._id === categoriaId).length === 0 ? (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-w-lg mx-auto text-left">
+                  <p className="text-sm font-medium text-yellow-800 mb-1">
+                    ⚠️ Atenção: Categoria sem prefixos cadastrados
+                  </p>
+                  <p className="text-xs text-yellow-700">
+                    A categoria <strong>"{filtroResult.categoria.nome}"</strong> não possui nenhum prefixo cadastrado para a busca automática. 
+                    Acesse a aba <strong>Configurações</strong> para cadastrar prefixos como "ARROZ", "FEIJAO", "BATATA", etc., permitindo que o sistema encontre e classifique as compras.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg max-w-lg mx-auto text-left">
+                  <p className="text-xs text-gray-600">
+                    <strong>Prefixos ativos para {filtroResult.categoria.nome}:</strong>{" "}
+                    {prefixos.filter(p => p.categoria?._id === categoriaId).map(p => p.prefixo).join(', ')}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Certifique-se de que existem compras correspondentes a estes prefixos nas datas selecionadas.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
