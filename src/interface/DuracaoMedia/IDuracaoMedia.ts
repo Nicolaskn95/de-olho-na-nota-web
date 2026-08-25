@@ -52,3 +52,23 @@ export interface DetalheCalculo {
   diferencasDias: number[]
   somaTotal: number
 }
+
+export interface DetalheProdutoIa {
+  nomeProduto: string
+  duracaoEstimadaDias: number
+  consumoDiarioEstimado: string
+  previsaoEsgotamento: string
+  confiancaProduto: 'Alta' | 'Média' | 'Baixa'
+  explicacaoIa: string
+}
+
+export interface CalcularDuracaoIaResponse {
+  duracaoMediaDias: number
+  confianca: 'Alta' | 'Média' | 'Baixa'
+  resumoIa: string
+  insights: string[]
+  previsaoProximaCompra: string
+  detalhesProdutos: DetalheProdutoIa[]
+  usouIa: boolean
+  modeloUsado: string
+}
