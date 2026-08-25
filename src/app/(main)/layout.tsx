@@ -1,5 +1,6 @@
 import { AuthGate } from "@/components/AuthGate";
 import { MainNav } from "@/components/MainNav";
+import { SessionThemeProvider } from "@/components/SessionThemeProvider";
 
 export default function MainLayout({
   children,
@@ -8,8 +9,10 @@ export default function MainLayout({
 }>) {
   return (
     <AuthGate>
-      <MainNav />
-      {children}
+      <SessionThemeProvider>
+        <MainNav />
+        {children}
+      </SessionThemeProvider>
     </AuthGate>
   );
 }

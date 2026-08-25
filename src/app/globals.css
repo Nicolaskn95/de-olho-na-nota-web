@@ -4,6 +4,11 @@
 :root {
   --background: #f8fafc;
   --foreground: #1f2937;
+  --user-color-primary: #10b981;
+  --user-color-secondary: #047857;
+  --user-color-subtle: rgba(16, 185, 129, 0.12);
+  --user-color-border: rgba(16, 185, 129, 0.3);
+  --user-color-glow: rgba(16, 185, 129, 0.4);
 }
 
 body {
@@ -11,4 +16,89 @@ body {
   color: var(--foreground);
   min-height: 100vh;
   font-family: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Propagação Global da Cor de Perfil da Sessão pelo Sistema Logado */
+h1.text-green-800,
+h2.text-green-800,
+h3.text-green-800 {
+  color: var(--user-color-secondary) !important;
+}
+
+.text-green-800 {
+  color: var(--user-color-secondary) !important;
+}
+
+.text-green-700 {
+  color: var(--user-color-primary) !important;
+}
+
+.text-green-600 {
+  color: var(--user-color-primary) !important;
+}
+
+.border-green-800,
+.border-green-600,
+.border-green-500 {
+  border-color: var(--user-color-primary) !important;
+}
+
+.bg-green-800,
+button.bg-green-800,
+a.bg-green-800 {
+  background: linear-gradient(135deg, var(--user-color-secondary), var(--user-color-primary)) !important;
+  color: #ffffff !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.bg-green-800:hover,
+button.bg-green-800:hover,
+a.bg-green-800:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 14px var(--user-color-glow) !important;
+}
+
+.bg-green-700,
+.hover\:bg-green-700:hover {
+  background-color: var(--user-color-primary) !important;
+}
+
+.bg-green-100 {
+  background-color: var(--user-color-subtle) !important;
+}
+
+.bg-green-50 {
+  background-color: var(--user-color-subtle) !important;
+}
+
+/* Utilitários Específicos do Tema */
+.user-theme-bg {
+  background-color: var(--user-color-primary) !important;
+}
+
+.user-theme-gradient {
+  background: linear-gradient(135deg, var(--user-color-secondary), var(--user-color-primary)) !important;
+}
+
+.user-theme-text {
+  color: var(--user-color-primary) !important;
+}
+
+.user-theme-border {
+  border-color: var(--user-color-primary) !important;
+}
+
+.user-theme-subtle-bg {
+  background-color: var(--user-color-subtle) !important;
+}
+
+.user-theme-btn {
+  background: linear-gradient(135deg, var(--user-color-secondary), var(--user-color-primary));
+  color: #ffffff;
+  transition: all 0.2s ease-in-out;
+}
+
+.user-theme-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 14px var(--user-color-glow);
 }

@@ -91,6 +91,38 @@ export const DEFAULT_PROFILE_COLOR = COLOR_PRESETS[0];
 const STORAGE_KEY = "session_profile_color";
 const EVENT_NAME = "session-profile-color-changed";
 
+function getSecondaryColor(hex: string): string {
+  if (!hex.startsWith("#") || hex.length !== 7) return hex;
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.max(0, (num >> 16) - 40);
+  const g = Math.max(0, ((num >> 8) & 0x00ff) - 40);
+  const b = Math.max(0, (num & 0x0000ff) - 40);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+export function findPresetByHex(hex: string): ProfileColorPreset | null {
+  const normalized = hex.toLowerCase();
+  return (
+    COLOR_PRESETS.find(
+      (p) => p.hex.toLowerCase() === normalized
+    ) || null
+  );
+}
+
+export function applyThemeVariables(hexColor: string): void {
+  if (typeof window === "undefined" || !document.documentElement) return;
+  const primary = hexColor.trim();
+  const preset = findPresetByHex(primary);
+  const secondary = preset ? preset.secondaryHex : getSecondaryColor(primary);
+
+  const root = document.documentElement;
+  root.style.setProperty("--user-color-primary", primary);
+  root.style.setProperty("--user-color-secondary", secondary);
+  root.style.setProperty("--user-color-subtle", `${primary}1a`);
+  root.style.setProperty("--user-color-border", `${primary}4d`);
+  root.style.setProperty("--user-color-glow", `${primary}66`);
+}
+
 export function getSessionProfileColor(): string {
   if (typeof window === "undefined") return DEFAULT_PROFILE_COLOR.hex;
   try {
@@ -115,6 +147,9 @@ export function setSessionProfileColor(hexColor: string): void {
   } catch {
     /* ignore */
   }
+
+  applyThemeVariables(cleanColor);
+
   window.dispatchEvent(
     new CustomEvent(EVENT_NAME, { detail: { color: cleanColor } })
   );
@@ -122,15 +157,6 @@ export function setSessionProfileColor(hexColor: string): void {
 
 export function resetSessionProfileColor(): void {
   setSessionProfileColor(DEFAULT_PROFILE_COLOR.hex);
-}
-
-export function findPresetByHex(hex: string): ProfileColorPreset | null {
-  const normalized = hex.toLowerCase();
-  return (
-    COLOR_PRESETS.find(
-      (p) => p.hex.toLowerCase() === normalized
-    ) || null
-  );
 }
 
 export function useSessionProfileColor(): {
@@ -142,20 +168,22 @@ export function useSessionProfileColor(): {
   const [color, setColorState] = useState<string>(DEFAULT_PROFILE_COLOR.hex);
 
   useEffect(() => {
-    setColorState(getSessionProfileColor());
+    const active = getSessionProfileColor();
+    setColorState(active);
+    applyThemeVariables(active);
 
     const handleCustomEvent = (e: Event) => {
       const customEvent = e as CustomEvent<{ color: string }>;
-      if (customEvent.detail?.color) {
-        setColorState(customEvent.detail.color);
-      } else {
-        setColorState(getSessionProfileColor());
-      }
+      const newCol = customEvent.detail?.color || getSessionProfileColor();
+      setColorState(newCol);
+      applyThemeVariables(newCol);
     };
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
-        setColorState(e.newValue || DEFAULT_PROFILE_COLOR.hex);
+        const newCol = e.newValue || DEFAULT_PROFILE_COLOR.hex;
+        setColorState(newCol);
+        applyThemeVariables(newCol);
       }
     };
 
