@@ -130,7 +130,7 @@ export function NotasFiscais() {
           ...getAuthHeaders(),
         },
         body: JSON.stringify({
-          produtos: produtosSemCategoria.map((p) => p.nome),
+          notaFiscalId: nota._id,
         }),
       });
 
