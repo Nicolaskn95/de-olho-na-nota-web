@@ -22,6 +22,7 @@ export function NotasFiscais() {
   const [erro, setErro] = useState<string | null>(null);
   const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
   const [modalProdutosAberto, setModalProdutosAberto] = useState(false);
+  const [classificandoNotaId, setClassificandoNotaId] = useState<string | null>(null);
 
   useEffect(() => {
     carregarDados();
@@ -109,6 +110,44 @@ export function NotasFiscais() {
     }
 
     return null;
+  };
+
+  const classificarNotaComIa = async (nota: NotaFiscal) => {
+    const produtosSemCategoria = (nota.produtos || []).filter(
+      (p) => obterCategoriaProduto(p.nome) === null,
+    );
+
+    if (produtosSemCategoria.length === 0) return;
+
+    setClassificandoNotaId(nota._id);
+    setErro(null);
+
+    try {
+      const res = await fetch(`${API_URL}/categorias/classificar-ia`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          produtos: produtosSemCategoria.map((p) => p.nome),
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || "Erro ao classificar produtos com IA",
+        );
+      }
+
+      const prefixosAtualizados: Prefixo[] = await res.json();
+      setPrefixos(prefixosAtualizados);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro na classificação por IA");
+    } finally {
+      setClassificandoNotaId(null);
+    }
   };
 
   const calcularGastosPorMes = (notas: NotaFiscal[]) => {
@@ -330,85 +369,131 @@ export function NotasFiscais() {
                 Notas de {mesSelecionado.mes} {mesSelecionado.ano}
               </h2>
               <div className="space-y-4">
-                {mesSelecionado.notas.map((nota) => (
-                  <div
-                    key={nota._id}
-                    className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-medium text-gray-800">
-                          {nota.estabelecimento}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          {formatarData(nota.dataEmissao)} - Nota #{nota.numero}
+                {mesSelecionado.notas.map((nota) => {
+                  const produtosSemCategoria = (nota.produtos || []).filter(
+                    (p) => obterCategoriaProduto(p.nome) === null,
+                  );
+                  const todosClassificados = produtosSemCategoria.length === 0;
+                  const estaClassificando = classificandoNotaId === nota._id;
+
+                  return (
+                    <div
+                      key={nota._id}
+                      className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-medium text-gray-800">
+                            {nota.estabelecimento}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            {formatarData(nota.dataEmissao)} - Nota #{nota.numero}
+                          </p>
+                        </div>
+                        <p className="text-lg font-bold text-green-700">
+                          {formatarMoeda(nota.valorPago)}
                         </p>
                       </div>
-                      <p className="text-lg font-bold text-green-700">
-                        {formatarMoeda(nota.valorPago)}
-                      </p>
-                    </div>
 
-                    {nota.produtos.length > 0 && (
-                      <details className="mt-2">
-                        <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-800">
-                          Ver {nota.produtos.length} produto
-                          {nota.produtos.length !== 1 ? "s" : ""}
-                        </summary>
-                        <ul className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200">
-                          {nota.produtos.map((produto, idx) => {
-                            const { nomePrincipal, nomeSecundario } =
-                              extrairNomeProduto(produto.nome);
-                            const categoria = obterCategoriaProduto(
-                              produto.nome,
-                            );
+                      {nota.produtos.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-800">
+                            Ver {nota.produtos.length} produto
+                            {nota.produtos.length !== 1 ? "s" : ""}
+                          </summary>
+                          <ul className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200">
+                            {nota.produtos.map((produto, idx) => {
+                              const { nomePrincipal, nomeSecundario } =
+                                extrairNomeProduto(produto.nome);
+                              const categoria = obterCategoriaProduto(
+                                produto.nome,
+                              );
 
-                            return (
-                              <li
-                                key={idx}
-                                className="text-sm flex justify-between items-start gap-2"
-                              >
-                                <div className="flex-1">
-                                  <span className="text-gray-600">
-                                    {produto.quantidade} {produto.unidade} -{" "}
-                                    {nomePrincipal}
-                                    {nomeSecundario && (
-                                      <span className="text-gray-400 text-xs ml-1">
-                                        ({nomeSecundario})
+                              return (
+                                <li
+                                  key={idx}
+                                  className="text-sm flex justify-between items-start gap-2"
+                                >
+                                  <div className="flex-1">
+                                    <span className="text-gray-600">
+                                      {produto.quantidade} {produto.unidade} -{" "}
+                                      {nomePrincipal}
+                                      {nomeSecundario && (
+                                        <span className="text-gray-400 text-xs ml-1">
+                                          ({nomeSecundario})
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                                    <span
+                                      className="text-xs px-2 py-0.5 rounded-full border"
+                                      style={{
+                                        backgroundColor:
+                                          categoria?.cor || "#f3f4f6",
+                                        borderColor: categoria?.cor || "#e5e7eb",
+                                        color: categoria ? "#ffffff" : "#6b7280",
+                                      }}
+                                    >
+                                      {categoria?.nome || "Outros"}
+                                    </span>
+                                    {formatarUnidade(produto.unidade) === "KG" && (
+                                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                                        Preço/kg:{" "}
+                                        {formatarMoeda(produto.valorUnitario)}
                                       </span>
                                     )}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap justify-end">
-                                  <span
-                                    className="text-xs px-2 py-0.5 rounded-full border"
-                                    style={{
-                                      backgroundColor:
-                                        categoria?.cor || "#f3f4f6",
-                                      borderColor: categoria?.cor || "#e5e7eb",
-                                      color: categoria ? "#ffffff" : "#6b7280",
-                                    }}
-                                  >
-                                    {categoria?.nome || "Outros"}
-                                  </span>
-                                  {formatarUnidade(produto.unidade) === "KG" && (
-                                    <span className="text-xs text-gray-500 whitespace-nowrap">
-                                      Preço/kg:{" "}
-                                      {formatarMoeda(produto.valorUnitario)}
+                                    <span className="text-gray-800 font-medium whitespace-nowrap">
+                                      Total: {formatarMoeda(produto.valorTotal)}
                                     </span>
-                                  )}
-                                  <span className="text-gray-800 font-medium whitespace-nowrap">
-                                    Total: {formatarMoeda(produto.valorTotal)}
-                                  </span>
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </details>
-                    )}
-                  </div>
-                ))}
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </details>
+                      )}
+
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          disabled={todosClassificados || estaClassificando}
+                          onClick={() => classificarNotaComIa(nota)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                            todosClassificados
+                              ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
+                              : estaClassificando
+                              ? "bg-purple-100 text-purple-700 border border-purple-300 animate-pulse cursor-wait"
+                              : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm hover:shadow"
+                          }`}
+                          title={
+                            todosClassificados
+                              ? "Todos os produtos desta nota fiscal já possuem categoria"
+                              : `Classificar ${produtosSemCategoria.length} produto(s) sem categoria com IA`
+                          }
+                        >
+                          {estaClassificando ? (
+                            <>
+                              <span className="w-3 h-3 border-2 border-purple-700 border-t-transparent rounded-full animate-spin" />
+                              Classificando com IA...
+                            </>
+                          ) : todosClassificados ? (
+                            <>
+                              <span>✓</span> Todos os produtos classificados
+                            </>
+                          ) : (
+                            <>
+                              <span>✨</span> Classificar com IA ({produtosSemCategoria.length} pendente{produtosSemCategoria.length > 1 ? "s" : ""})
+                            </>
+                          )}
+                        </button>
+                        <span className="text-xs text-gray-500">
+                          {nota.produtos.length - produtosSemCategoria.length} de {nota.produtos.length} classificados
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
