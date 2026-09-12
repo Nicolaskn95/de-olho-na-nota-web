@@ -8,6 +8,7 @@ import {
 } from '@/interface/Prefixo/IPrefixo'
 import { getAuthHeaders } from '@/lib/auth-api'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { GripVertical, Search, Pencil, Trash2, Tag, Sparkles } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -137,6 +138,9 @@ export function Categorias({ compact }: CategoriasProps) {
   const [previewCsv, setPreviewCsv] = useState<CsvPreviewRow[]>([])
   const [nomeArquivoCsv, setNomeArquivoCsv] = useState<string | null>(null)
   const [importando, setImportando] = useState(false)
+  const [draggedPrefixo, setDraggedPrefixo] = useState<Prefixo | null>(null)
+  const [dragOverCatId, setDragOverCatId] = useState<string | null>(null)
+  const [buscaPrefixo, setBuscaPrefixo] = useState('')
   const categoriasRef = useRef<Categoria[]>([])
 
   useEffect(() => {
@@ -413,21 +417,120 @@ export function Categorias({ compact }: CategoriasProps) {
     }
   }
 
-  const prefixosPorCategoria = prefixos.reduce(
-    (acc, prefixo) => {
-      const catId = prefixo.categoria?._id || 'sem-categoria'
-      if (!acc[catId]) {
-        acc[catId] = []
-      }
-      acc[catId].push(prefixo)
-      return acc
+  const getCategoriaById = useCallback(
+    (id: string) => {
+      return categorias.find((c) => c._id === id)
     },
-    {} as Record<string, Prefixo[]>,
+    [categorias],
   )
 
-  const getCategoriaById = (id: string) => {
-    return categorias.find((c) => c._id === id)
+  const moverPrefixoParaCategoria = async (
+    prefixoId: string,
+    novaCategoriaId: string,
+  ) => {
+    const pref = prefixos.find((p) => p._id === prefixoId)
+    if (!pref) return
+    const catAntiga = pref.categoria
+    if (catAntiga?._id === novaCategoriaId) return
+
+    const catNova = getCategoriaById(novaCategoriaId)
+    if (!catNova) return
+
+    setPrefixos((prev) =>
+      prev.map((p) =>
+        p._id === prefixoId ? { ...p, categoria: catNova } : p,
+      ),
+    )
+    setSucesso(`Prefixo "${pref.prefixo}" movido para "${catNova.nome}"!`)
+    setErro(null)
+
+    try {
+      const response = await fetch(
+        `${API_URL}/categorias/prefixos/${prefixoId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            prefixo: pref.prefixo,
+            categoriaId: novaCategoriaId,
+          }),
+        },
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status}`)
+      }
+
+      const prefixoAtualizado = await response.json()
+      setPrefixos((prev) =>
+        prev
+          .map((p) => (p._id === prefixoId ? prefixoAtualizado : p))
+          .sort((a, b) => a.prefixo.localeCompare(b.prefixo)),
+      )
+    } catch (e) {
+      setPrefixos((prev) =>
+        prev.map((p) =>
+          p._id === prefixoId ? { ...p, categoria: catAntiga } : p,
+        ),
+      )
+      setErro(
+        e instanceof Error
+          ? e.message
+          : `Erro ao mover prefixo "${pref.prefixo}" para "${catNova.nome}"`,
+      )
+      setSucesso(null)
+    }
   }
+
+  const handleDragOver = (e: React.DragEvent, catId: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverCatId !== catId) {
+      setDragOverCatId(catId)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent, catId: string) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    if (dragOverCatId === catId) {
+      setDragOverCatId(null)
+    }
+  }
+
+  const handleDrop = async (e: React.DragEvent, catId: string) => {
+    e.preventDefault()
+    setDragOverCatId(null)
+    const prefixoId =
+      e.dataTransfer.getData('text/plain') || draggedPrefixo?._id
+    if (prefixoId) {
+      await moverPrefixoParaCategoria(prefixoId, catId)
+    }
+    setDraggedPrefixo(null)
+  }
+
+  const prefixosFiltrados = prefixos.filter((p) => {
+    if (!buscaPrefixo.trim()) return true
+    const termo = buscaPrefixo.toLowerCase().trim()
+    return (
+      p.prefixo.toLowerCase().includes(termo) ||
+      p.categoria?.nome?.toLowerCase().includes(termo) ||
+      p.categoria?.codigo?.toLowerCase().includes(termo)
+    )
+  })
+
+  const todasCategorias = [...categorias]
+  prefixos.forEach((p) => {
+    if (
+      p.categoria &&
+      !todasCategorias.some((c) => c._id === p.categoria._id)
+    ) {
+      todasCategorias.push(p.categoria)
+    }
+  })
 
   if (carregando) {
     return (
@@ -715,61 +818,156 @@ export function Categorias({ compact }: CategoriasProps) {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Prefixos Cadastrados ({prefixos.length})
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              Prefixos Cadastrados
+              <span className="px-2.5 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                {prefixos.length}
+              </span>
+            </h2>
+            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              💡 <strong>Arraste e solte</strong> qualquer prefixo para mover de categoria.
+            </p>
+          </div>
+
+          <div className="relative min-w-[240px]">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={buscaPrefixo}
+              onChange={(e) => setBuscaPrefixo(e.target.value)}
+              placeholder="Buscar prefixo..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+            />
+          </div>
+        </div>
 
         {prefixos.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">
-            Nenhum prefixo cadastrado ainda. Importe um CSV ou cadastre manualmente.
-          </p>
+          <div className="text-center py-12 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+            <Tag className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-600 font-medium">Nenhum prefixo cadastrado ainda.</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Importe um CSV acima ou cadastre um prefixo manualmente.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-6">
-            {Object.entries(prefixosPorCategoria).map(([catId, items]) => {
-              const categoria = getCategoriaById(catId)
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {todasCategorias.map((cat) => {
+              const items = prefixosFiltrados.filter(
+                (p) => p.categoria?._id === cat._id,
+              )
+              const isOver = dragOverCatId === cat._id
+              const isDraggingSome = Boolean(draggedPrefixo)
+              const isOrigem = draggedPrefixo?.categoria?._id === cat._id
+
               return (
-                <div key={catId}>
-                  <h3
-                    className="text-sm font-medium mb-2 border-b pb-1 flex items-center gap-2"
-                    style={{
-                      color: categoria?.cor || '#666',
-                      borderColor: categoria?.cor || '#e5e7eb',
-                    }}
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: categoria?.cor || '#9ca3af' }}
-                    />
-                    {categoria?.nome || 'Sem categoria'}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {items.map((prefixo) => (
+                <div
+                  key={cat._id}
+                  onDragOver={(e) => handleDragOver(e, cat._id)}
+                  onDragLeave={(e) => handleDragLeave(e, cat._id)}
+                  onDrop={(e) => handleDrop(e, cat._id)}
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${
+                    isOver
+                      ? 'border-green-500 bg-green-50/90 shadow-md ring-2 ring-green-500/30 scale-[1.01]'
+                      : isDraggingSome && !isOrigem
+                      ? 'border-dashed border-green-400 bg-green-50/30 hover:border-green-500'
+                      : 'border-gray-100 bg-gray-50/40 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200/60">
+                    <div className="flex items-center gap-2">
                       <span
-                        key={prefixo._id}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full text-sm"
+                        className="w-3.5 h-3.5 rounded-full shadow-xs border border-white"
+                        style={{ backgroundColor: cat.cor || '#10B981' }}
+                      />
+                      <h3
+                        className="font-bold text-sm tracking-tight"
+                        style={{ color: cat.cor || '#1F2937' }}
                       >
-                        <span className="font-mono font-medium text-gray-800">
-                          {prefixo.prefixo}
-                        </span>
-                        <button
-                          onClick={() => iniciarEdicao(prefixo)}
-                          className="text-gray-400 hover:text-blue-500 transition-colors"
-                          title="Editar prefixo"
-                        >
-                          ✎
-                        </button>
-                        <button
-                          onClick={() =>
-                            removerPrefixo(prefixo._id, prefixo.prefixo)
-                          }
-                          className="text-gray-400 hover:text-red-500 transition-colors"
-                          title="Remover prefixo"
-                        >
-                          ✕
-                        </button>
+                        {cat.nome}
+                      </h3>
+                      <span className="text-[11px] font-mono px-1.5 py-0.5 bg-gray-200/60 text-gray-600 rounded">
+                        {cat.codigo}
                       </span>
-                    ))}
+                    </div>
+
+                    <span className="text-xs font-semibold px-2 py-0.5 bg-white border border-gray-200 rounded-full text-gray-600 shadow-xs">
+                      {items.length} {items.length === 1 ? 'prefixo' : 'prefixos'}
+                    </span>
                   </div>
+
+                  {isOver && (
+                    <div className="mb-2 py-1.5 px-3 bg-green-600 text-white text-xs font-medium rounded-lg text-center shadow-sm animate-pulse flex items-center justify-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Solte para mover &quot;{draggedPrefixo?.prefixo}&quot; para {cat.nome}
+                    </div>
+                  )}
+
+                  {items.length === 0 ? (
+                    <div className="py-5 text-center border-2 border-dashed border-gray-200 rounded-lg bg-white/50 text-xs text-gray-400">
+                      Nenhum prefixo. Arraste um prefixo aqui para categorizar.
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 min-h-[40px] items-center">
+                      {items.map((prefixo) => {
+                        const isBeingDragged =
+                          draggedPrefixo?._id === prefixo._id
+
+                        return (
+                          <div
+                            key={prefixo._id}
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggedPrefixo(prefixo)
+                              e.dataTransfer.setData('text/plain', prefixo._id)
+                              e.dataTransfer.effectAllowed = 'move'
+                            }}
+                            onDragEnd={() => {
+                              setDraggedPrefixo(null)
+                              setDragOverCatId(null)
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm shadow-xs select-none cursor-grab active:cursor-grabbing hover:border-green-500 hover:shadow-sm transition-all group ${
+                              isBeingDragged
+                                ? 'opacity-40 ring-2 ring-green-500 scale-95'
+                                : ''
+                            }`}
+                          >
+                            <GripVertical className="w-3.5 h-3.5 text-gray-400 group-hover:text-green-600 transition-colors" />
+                            <span className="font-mono font-bold text-gray-800 tracking-wide">
+                              {prefixo.prefixo}
+                            </span>
+
+                            <div className="flex items-center gap-1 ml-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  iniciarEdicao(prefixo)
+                                }}
+                                className="p-0.5 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                                title="Editar prefixo"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removerPrefixo(prefixo._id, prefixo.prefixo)
+                                }}
+                                className="p-0.5 text-gray-400 hover:text-red-600 rounded transition-colors"
+                                title="Remover prefixo"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}
