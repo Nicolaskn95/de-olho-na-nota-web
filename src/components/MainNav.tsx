@@ -21,6 +21,7 @@ export function MainNav() {
     () => [
       { href: "/", label: "Escanear Cupom" },
       { href: "/notasfiscais", label: "Notas Fiscais" },
+      { href: "/produtos", label: "Produtos" },
       { href: "/financeiro", label: "Financeiro" },
     ],
     []
