@@ -175,37 +175,6 @@ export function ModalPesquisaProdutosNota({
           </button>
         </div>
 
-        {/* Métrica Resumida */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-white border-b border-gray-100">
-          <div className="p-3 bg-green-50/60 border border-green-100 rounded-xl">
-            <span className="text-xs text-green-700 font-medium block">
-              Total Gasto nestes Produtos
-            </span>
-            <span className="text-xl font-bold text-green-800">
-              {formatarMoeda(totalGasto)}
-            </span>
-          </div>
-
-          <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl">
-            <span className="text-xs text-blue-700 font-medium block">
-              Total de Itens Encontrados
-            </span>
-            <span className="text-xl font-bold text-blue-800">
-              {produtosEncontrados.length} compra(s)
-            </span>
-          </div>
-
-          <div className="p-3 bg-purple-50/60 border border-purple-100 rounded-xl">
-            <span className="text-xs text-purple-700 font-medium block">
-              Média por Item
-            </span>
-            <span className="text-xl font-bold text-purple-800">
-              {produtosEncontrados.length > 0
-                ? formatarMoeda(totalGasto / produtosEncontrados.length)
-                : 'R$ 0,00'}
-            </span>
-          </div>
-        </div>
 
         {/* Campo de Busca Interno */}
         <div className="p-4 border-b border-gray-100 bg-gray-50/30 flex items-center gap-3">
