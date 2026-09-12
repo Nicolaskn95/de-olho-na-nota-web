@@ -8,7 +8,8 @@ import {
 } from '@/interface/Prefixo/IPrefixo'
 import { getAuthHeaders } from '@/lib/auth-api'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { GripVertical, Search, Pencil, Trash2, Tag, Sparkles, FolderInput } from 'lucide-react'
+import { GripVertical, Search, Pencil, Trash2, Tag, Sparkles, FolderInput, MoreVertical, ShoppingBag, ChevronRight } from 'lucide-react'
+import { ModalPesquisaProdutosNota } from '@/components/ModalPesquisaProdutosNota'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -141,7 +142,10 @@ export function Categorias({ compact }: CategoriasProps) {
   const [draggedPrefixo, setDraggedPrefixo] = useState<Prefixo | null>(null)
   const [dragOverCatId, setDragOverCatId] = useState<string | null>(null)
   const [buscaPrefixo, setBuscaPrefixo] = useState('')
-  const [menuCategoriaAbertoId, setMenuCategoriaAbertoId] = useState<string | null>(null)
+  const [menuDropdownAbertoId, setMenuDropdownAbertoId] = useState<string | null>(null)
+  const [subCategoryMenuAbertoId, setSubCategoryMenuAbertoId] = useState<string | null>(null)
+  const [prefixoPesquisa, setPrefixoPesquisa] = useState<Prefixo | null>(null)
+  const [modalPesquisaAberto, setModalPesquisaAberto] = useState(false)
   const categoriasRef = useRef<Categoria[]>([])
 
   useEffect(() => {
@@ -149,9 +153,12 @@ export function Categorias({ compact }: CategoriasProps) {
   }, [categorias])
 
   useEffect(() => {
-    const fecharMenu = () => setMenuCategoriaAbertoId(null)
-    window.addEventListener('click', fecharMenu)
-    return () => window.removeEventListener('click', fecharMenu)
+    const fecharMenus = () => {
+      setMenuDropdownAbertoId(null)
+      setSubCategoryMenuAbertoId(null)
+    }
+    window.addEventListener('click', fecharMenus)
+    return () => window.removeEventListener('click', fecharMenus)
   }, [])
 
   const carregarPrefixos = useCallback(async () => {
@@ -946,107 +953,160 @@ export function Categorias({ compact }: CategoriasProps) {
                               {prefixo.prefixo}
                             </span>
 
-                            <div className="flex items-center gap-1 ml-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                              {/* Botão 1: Editar (Modal) */}
+                            <div className="flex items-center gap-1 ml-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                              {/* Quarto Botão: Pesquisar Produtos deste Prefixo nas Notas Fiscais */}
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  iniciarEdicao(prefixo)
+                                  setPrefixoPesquisa(prefixo)
+                                  setModalPesquisaAberto(true)
                                 }}
-                                className="p-0.5 text-gray-400 hover:text-blue-600 rounded transition-colors"
-                                title="Editar prefixo (modal)"
+                                className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                                title="Pesquisar produtos deste prefixo nas Notas Fiscais"
                               >
-                                <Pencil className="w-3 h-3" />
+                                <ShoppingBag className="w-3.5 h-3.5" />
                               </button>
 
-                              {/* Botão 2: Seleção Rápida de Categoria */}
+                              {/* Menu Suspenso Agrupado (Três Pontos) */}
                               <div className="relative">
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    setMenuCategoriaAbertoId(
-                                      menuCategoriaAbertoId === prefixo._id
+                                    setSubCategoryMenuAbertoId(null)
+                                    setMenuDropdownAbertoId(
+                                      menuDropdownAbertoId === prefixo._id
                                         ? null
                                         : prefixo._id,
                                     )
                                   }}
-                                  className={`p-0.5 rounded transition-colors flex items-center ${
-                                    menuCategoriaAbertoId === prefixo._id
-                                      ? 'text-green-700 bg-green-100'
-                                      : 'text-gray-400 hover:text-green-600'
+                                  className={`p-1 rounded-md transition-colors ${
+                                    menuDropdownAbertoId === prefixo._id
+                                      ? 'text-gray-800 bg-gray-200'
+                                      : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
                                   }`}
-                                  title="Escolher entre as categorias"
+                                  title="Opções do prefixo"
                                 >
-                                  <FolderInput className="w-3 h-3" />
+                                  <MoreVertical className="w-3.5 h-3.5" />
                                 </button>
 
-                                {menuCategoriaAbertoId === prefixo._id && (
+                                {menuDropdownAbertoId === prefixo._id && (
                                   <div
-                                    className="absolute z-30 top-full right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
+                                    className="absolute z-30 top-full right-0 mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex items-center justify-between">
-                                      <span>Mover para categoria</span>
-                                      <span className="text-gray-300 font-normal">1 clique</span>
+                                    <div className="px-3 py-1.5 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                      Prefixo: {prefixo.prefixo}
                                     </div>
-                                    <div className="max-h-52 overflow-y-auto py-1">
-                                      {todasCategorias.map((c) => {
-                                        const isAtual =
-                                          c._id === prefixo.categoria?._id
-                                        return (
-                                          <button
-                                            key={c._id}
-                                            type="button"
-                                            onClick={() => {
-                                              moverPrefixoParaCategoria(
-                                                prefixo._id,
-                                                c._id,
-                                              )
-                                              setMenuCategoriaAbertoId(null)
-                                            }}
-                                            className={`w-full text-left px-3 py-1.5 hover:bg-green-50/80 flex items-center gap-2 transition-colors ${
-                                              isAtual
-                                                ? 'bg-green-50 font-bold text-green-800'
-                                                : 'text-gray-700'
-                                            }`}
-                                          >
-                                            <span
-                                              className="w-2.5 h-2.5 rounded-full shrink-0 border border-white shadow-xs"
-                                              style={{
-                                                backgroundColor:
-                                                  c.cor || '#9ca3af',
-                                              }}
-                                            />
-                                            <span className="truncate flex-1 text-xs">
-                                              {c.nome}
-                                            </span>
-                                            {isAtual && (
-                                              <span className="text-[10px] bg-green-200 text-green-800 px-1.5 py-0.2 rounded font-medium">
-                                                Atual
-                                              </span>
-                                            )}
-                                          </button>
-                                        )
-                                      })}
+
+                                    {/* 1. Pesquisar nas Notas Fiscais */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setMenuDropdownAbertoId(null)
+                                        setPrefixoPesquisa(prefixo)
+                                        setModalPesquisaAberto(true)
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-green-50 text-gray-700 hover:text-green-800 flex items-center gap-2 transition-colors"
+                                    >
+                                      <ShoppingBag className="w-3.5 h-3.5 text-green-600" />
+                                      <span>Pesquisar produtos nas Notas Fiscais</span>
+                                    </button>
+
+                                    {/* 2. Trocar de Categoria */}
+                                    <div className="relative">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSubCategoryMenuAbertoId(
+                                            subCategoryMenuAbertoId === prefixo._id
+                                              ? null
+                                              : prefixo._id,
+                                          )
+                                        }}
+                                        className="w-full text-left px-3 py-2 hover:bg-green-50 text-gray-700 hover:text-green-800 flex items-center justify-between gap-2 transition-colors border-t border-gray-50"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <FolderInput className="w-3.5 h-3.5 text-blue-600" />
+                                          <span>Trocar de Categoria</span>
+                                        </div>
+                                        <ChevronRight className="w-3 h-3 text-gray-400" />
+                                      </button>
+
+                                      {subCategoryMenuAbertoId === prefixo._id && (
+                                        <div className="max-h-48 overflow-y-auto bg-gray-50/80 border-t border-b border-gray-100 py-1 my-0.5">
+                                          {todasCategorias.map((c) => {
+                                            const isAtual =
+                                              c._id === prefixo.categoria?._id
+                                            return (
+                                              <button
+                                                key={c._id}
+                                                type="button"
+                                                onClick={() => {
+                                                  moverPrefixoParaCategoria(
+                                                    prefixo._id,
+                                                    c._id,
+                                                  )
+                                                  setMenuDropdownAbertoId(null)
+                                                  setSubCategoryMenuAbertoId(null)
+                                                }}
+                                                className={`w-full text-left pl-7 pr-3 py-1.5 hover:bg-green-100/80 flex items-center gap-2 transition-colors text-xs ${
+                                                  isAtual
+                                                    ? 'bg-green-100 font-bold text-green-900'
+                                                    : 'text-gray-700'
+                                                }`}
+                                              >
+                                                <span
+                                                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-white"
+                                                  style={{
+                                                    backgroundColor:
+                                                      c.cor || '#9ca3af',
+                                                  }}
+                                                />
+                                                <span className="truncate flex-1">
+                                                  {c.nome}
+                                                </span>
+                                                {isAtual && (
+                                                  <span className="text-[9px] bg-green-200 text-green-800 px-1 py-0.2 rounded">
+                                                    Atual
+                                                  </span>
+                                                )}
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
                                     </div>
+
+                                    {/* 3. Editar Prefixo */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setMenuDropdownAbertoId(null)
+                                        iniciarEdicao(prefixo)
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-700 flex items-center gap-2 transition-colors border-t border-gray-50"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 text-blue-500" />
+                                      <span>Editar Prefixo</span>
+                                    </button>
+
+                                    {/* 4. Remover Prefixo */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setMenuDropdownAbertoId(null)
+                                        removerPrefixo(prefixo._id, prefixo.prefixo)
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600 hover:text-red-700 flex items-center gap-2 transition-colors border-t border-gray-100 font-medium"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                      <span>Remover Prefixo</span>
+                                    </button>
                                   </div>
                                 )}
                               </div>
-
-                              {/* Botão 3: Remover */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  removerPrefixo(prefixo._id, prefixo.prefixo)
-                                }}
-                                className="p-0.5 text-gray-400 hover:text-red-600 rounded transition-colors"
-                                title="Remover prefixo"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
                             </div>
                           </div>
                         )
@@ -1059,6 +1119,11 @@ export function Categorias({ compact }: CategoriasProps) {
           </div>
         )}
       </div>
+      <ModalPesquisaProdutosNota
+        open={modalPesquisaAberto}
+        onClose={() => setModalPesquisaAberto(false)}
+        prefixo={prefixoPesquisa}
+      />
     </div>
   )
 }
