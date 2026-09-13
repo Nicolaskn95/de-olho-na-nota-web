@@ -14,7 +14,9 @@ import {
   registerRequest,
 } from "@/lib/auth-api";
 
-const GOOGLE_CLIENT_ID: string = process.env.GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID ||
+  "743020408271-ge3g4tooe22eb2m83vsek8iuvfedjhrj.apps.googleusercontent.com";
 
 type Mode = "login" | "register";
 
@@ -459,7 +461,7 @@ function LoginFormContent() {
 
 export function LoginGlass() {
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || ""}>
       <LoginFormContent />
     </GoogleOAuthProvider>
   );
