@@ -83,6 +83,7 @@ export function ModalPesquisaProdutosNota({
 
     for (const nota of notas) {
       for (const p of nota.produtos || []) {
+        if (!p || !p.nome) continue
         const nomeUpper = p.nome.toUpperCase().trim()
 
         const correspondePrefixo =

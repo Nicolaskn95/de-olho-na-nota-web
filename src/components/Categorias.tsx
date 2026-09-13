@@ -891,31 +891,32 @@ export function Categorias({ compact }: CategoriasProps) {
                       : 'border-gray-100 bg-gray-50/40 hover:border-gray-300'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200/60">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 mb-3 pb-2 border-b border-gray-200/60">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span
-                        className="w-3.5 h-3.5 rounded-full shadow-xs border border-white"
+                        className="w-3.5 h-3.5 rounded-full shadow-xs border border-white shrink-0"
                         style={{ backgroundColor: cat.cor || '#10B981' }}
                       />
                       <h3
-                        className="font-bold text-sm tracking-tight"
+                        className="font-bold text-sm tracking-tight truncate"
                         style={{ color: cat.cor || '#1F2937' }}
+                        title={cat.nome}
                       >
                         {cat.nome}
                       </h3>
-                      <span className="text-[11px] font-mono px-1.5 py-0.5 bg-gray-200/60 text-gray-600 rounded">
+                      <span className="text-[11px] font-mono px-1.5 py-0.5 bg-gray-200/60 text-gray-600 rounded shrink-0">
                         {cat.codigo}
                       </span>
                     </div>
 
-                    <span className="text-xs font-semibold px-2 py-0.5 bg-white border border-gray-200 rounded-full text-gray-600 shadow-xs">
+                    <span className="text-xs font-semibold px-2 py-0.5 bg-white border border-gray-200 rounded-full text-gray-600 shadow-xs shrink-0">
                       {items.length} {items.length === 1 ? 'prefixo' : 'prefixos'}
                     </span>
                   </div>
 
                   {isOver && (
                     <div className="mb-2 py-1.5 px-3 bg-green-600 text-white text-xs font-medium rounded-lg text-center shadow-sm animate-pulse flex items-center justify-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
                       Solte para mover &quot;{draggedPrefixo?.prefixo}&quot; para {cat.nome}
                     </div>
                   )}
@@ -943,20 +944,20 @@ export function Categorias({ compact }: CategoriasProps) {
                               setDraggedPrefixo(null)
                               setDragOverCatId(null)
                             }}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm shadow-xs select-none cursor-grab active:cursor-grabbing hover:border-green-500 hover:shadow-sm transition-all group ${
+                            className={`inline-flex max-w-full items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs sm:text-sm shadow-xs select-none cursor-grab active:cursor-grabbing hover:border-green-500 hover:shadow-sm transition-all group ${
                               isBeingDragged
                                 ? 'opacity-40 ring-2 ring-green-500 scale-95'
                                 : ''
                             }`}
                           >
-                            <GripVertical className="w-3.5 h-3.5 text-gray-400 group-hover:text-green-600 transition-colors" />
-                            <span className="font-mono font-bold text-gray-800 tracking-wide">
+                            <GripVertical className="w-3.5 h-3.5 shrink-0 text-gray-400 group-hover:text-green-600 transition-colors" />
+                            <span className="font-mono font-bold text-gray-800 tracking-wide truncate min-w-0 max-w-[130px] sm:max-w-[200px]" title={prefixo.prefixo}>
                               {prefixo.prefixo}
                             </span>
 
-                            <div className="flex items-center gap-1 ml-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 ml-0.5 sm:ml-1 shrink-0 opacity-100 sm:opacity-80 sm:group-hover:opacity-100 transition-opacity">
                               {/* Menu Suspenso Agrupado (Três Pontos) */}
-                              <div className="relative">
+                              <div className={`relative ${menuDropdownAbertoId === prefixo._id ? 'z-50' : ''}`}>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -980,9 +981,9 @@ export function Categorias({ compact }: CategoriasProps) {
 
                                 {menuDropdownAbertoId === prefixo._id && (
                                   <>
-                                    {/* Backdrop para fechar ao clicar fora no mobile */}
+                                    {/* Backdrop para fechar ao clicar fora no mobile/desktop */}
                                     <div
-                                      className="fixed inset-0 bg-black/40 sm:bg-transparent z-40 sm:z-auto"
+                                      className="fixed inset-0 bg-black/40 sm:bg-transparent z-40"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         setMenuDropdownAbertoId(null)
@@ -992,7 +993,7 @@ export function Categorias({ compact }: CategoriasProps) {
 
                                     {/* Menu Dropdown: Bottom Sheet em Mobile (<640px) e Popover Flutuante em Desktop (>=640px) */}
                                     <div
-                                      className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl p-4 sm:p-1 max-h-[85vh] overflow-y-auto sm:overflow-visible sm:max-h-none sm:static sm:absolute sm:top-full sm:right-0 sm:left-auto sm:bottom-auto sm:w-60 sm:rounded-xl sm:border sm:border-gray-200 text-sm sm:text-xs animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 sm:fade-in sm:zoom-in-95 duration-150"
+                                      className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl p-4 sm:p-1 max-h-[85vh] overflow-y-auto sm:overflow-visible sm:max-h-none sm:absolute sm:top-full sm:right-0 sm:left-auto sm:bottom-auto sm:w-60 sm:rounded-xl sm:border sm:border-gray-200 text-sm sm:text-xs animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 sm:fade-in sm:zoom-in-95 duration-150"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       {/* Cabeçalho do Menu */}
