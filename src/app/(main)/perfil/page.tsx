@@ -1,32 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAccessToken, getAuthHeaders, getAuthUser } from "@/lib/auth-api";
+import {
+  getAccessToken,
+  getAuthHeaders,
+  getAuthUser,
+  fetchUserProfile,
+  linkGoogleRequest,
+  unlinkGoogleRequest,
+  UserProfileResponse,
+} from "@/lib/auth-api";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
   COLOR_PRESETS,
   DEFAULT_PROFILE_COLOR,
   useSessionProfileColor,
 } from "@/lib/profile-color";
-import { Check, Palette, RotateCcw, Sparkles } from "lucide-react";
+import { Check, Palette, RotateCcw, Sparkles, Shield, Unlink, Link as LinkIcon, CheckCircle2 } from "lucide-react";
+import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID;
 
-function readErrorMessage(res: Response): Promise<string> {
-  return res
-    .json()
-    .then((body) => {
-      if (body?.message)
-        return Array.isArray(body.message)
-          ? body.message.join(", ")
-          : String(body.message);
-      return res.statusText || "Erro na requisição";
-    })
-    .catch(() => res.statusText || "Erro na requisição");
+function LinkGoogleButton({
+  onSuccess,
+  onError,
+  loading,
+}: {
+  onSuccess: (token: string) => void;
+  onError: (msg: string) => void;
+  loading: boolean;
+}) {
+  const login = useGoogleLogin({
+    onSuccess: (tokenResponse) => {
+      if (tokenResponse.access_token) {
+        onSuccess(tokenResponse.access_token);
+      }
+    },
+    onError: () => onError("Falha ao autenticar com o Google"),
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => login()}
+      disabled={loading}
+      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-800 font-semibold text-xs sm:text-sm shadow-sm hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-60"
+    >
+      <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+      </svg>
+      <span>{loading ? "Viculando..." : "Vincular Conta Google"}</span>
+    </button>
+  );
 }
 
-export default function PerfilPage() {
+function PerfilContent() {
   const [username, setUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -34,7 +67,9 @@ export default function PerfilPage() {
 
   const [savingName, setSavingName] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
 
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -43,9 +78,19 @@ export default function PerfilPage() {
   const [customHex, setCustomHex] = useState(color);
   const [colorFeedback, setColorFeedback] = useState<string | null>(null);
 
+  const loadProfile = async () => {
+    try {
+      const data = await fetchUserProfile();
+      setProfile(data);
+      if (data.username) setUsername(data.username);
+    } catch {
+      const user = getAuthUser();
+      setUsername(user?.username ?? "");
+    }
+  };
+
   useEffect(() => {
-    const user = getAuthUser();
-    setUsername(user?.username ?? "");
+    loadProfile();
   }, []);
 
   useEffect(() => {
@@ -70,6 +115,37 @@ export default function PerfilPage() {
     resetColor();
     setColorFeedback("Cor padrão da sessão restaurada.");
     setTimeout(() => setColorFeedback(null), 4000);
+  };
+
+  const handleLinkGoogle = async (token: string) => {
+    setError(null);
+    setSuccess(null);
+    setLinkingGoogle(true);
+    try {
+      await linkGoogleRequest(token);
+      setSuccess("Conta do Google vinculada com sucesso!");
+      await loadProfile();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao vincular conta do Google.");
+    } finally {
+      setLinkingGoogle(false);
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    if (!confirm("Deseja realmente desvincular sua conta do Google?")) return;
+    setError(null);
+    setSuccess(null);
+    setLinkingGoogle(true);
+    try {
+      await unlinkGoogleRequest();
+      setSuccess("Conta do Google desvinculada.");
+      await loadProfile();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao desvincular conta do Google.");
+    } finally {
+      setLinkingGoogle(false);
+    }
   };
 
   const onSaveUsername = async (e: React.FormEvent) => {
@@ -100,23 +176,16 @@ export default function PerfilPage() {
       });
 
       if (!res.ok) {
-        throw new Error(await readErrorMessage(res));
+        const msg = await res.json().then((b) => b?.message || res.statusText);
+        throw new Error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
 
       const data = (await res.json()) as { id: string; username: string };
 
-      // Atualiza o usuário no storage para refletir no dropdown.
       try {
-        const raw =
-          localStorage.getItem("auth_user") ??
-          sessionStorage.getItem("auth_user");
-        const parsed = raw
-          ? (JSON.parse(raw) as { id?: string; username?: string })
-          : null;
-        const next = {
-          id: data.id ?? parsed?.id ?? "",
-          username: data.username,
-        };
+        const raw = localStorage.getItem("auth_user") ?? sessionStorage.getItem("auth_user");
+        const parsed = raw ? (JSON.parse(raw) as { id?: string; username?: string }) : null;
+        const next = { id: data.id ?? parsed?.id ?? "", username: data.username };
         localStorage.setItem("auth_user", JSON.stringify(next));
         sessionStorage.setItem("auth_user", JSON.stringify(next));
       } catch {
@@ -124,11 +193,10 @@ export default function PerfilPage() {
       }
 
       setUsername(data.username);
-      setSuccess("Nome atualizado com sucesso.");
+      setSuccess("Nome de usuário atualizado com sucesso.");
+      await loadProfile();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Falha ao atualizar nome."
-      );
+      setError(err instanceof Error ? err.message : "Falha ao atualizar nome.");
     } finally {
       setSavingName(false);
     }
@@ -170,17 +238,17 @@ export default function PerfilPage() {
       });
 
       if (!res.ok) {
-        throw new Error(await readErrorMessage(res));
+        const msg = await res.json().then((b) => b?.message || res.statusText);
+        throw new Error(Array.isArray(msg) ? msg.join(", ") : msg);
       }
 
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
       setSuccess("Senha alterada com sucesso.");
+      await loadProfile();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Falha ao alterar a senha."
-      );
+      setError(err instanceof Error ? err.message : "Falha ao alterar a senha.");
     } finally {
       setChangingPassword(false);
     }
@@ -190,25 +258,23 @@ export default function PerfilPage() {
     <main className="min-h-screen py-6 sm:py-10 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
         <header className="text-center">
-          <h1 className="text-3xl font-bold text-green-800 mb-2">
-            Perfil do Usuário
-          </h1>
+          <h1 className="text-3xl font-bold text-green-800 mb-2">Perfil do Usuário</h1>
           <p className="text-gray-600">
-            Gerencie suas credenciais e personalize a cor do seu perfil para a sessão
+            Gerencie suas credenciais, segurança e contas conectadas
           </p>
         </header>
 
-        {error ? (
+        {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-center shadow-sm">
             {error}
           </div>
-        ) : null}
+        )}
 
-        {success ? (
+        {success && (
           <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center shadow-sm">
             {success}
           </div>
-        ) : null}
+        )}
 
         {/* Hero Preview Card do Perfil */}
         <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-gray-900 via-gray-800 to-green-950 p-6 sm:p-8 text-white shadow-xl border border-white/10">
@@ -216,32 +282,90 @@ export default function PerfilPage() {
             <UserAvatar username={username} size="xl" showGlow />
             <div className="text-center sm:text-left space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/15 backdrop-blur-md border border-white/20">
-                <span
-                  className="w-2.5 h-2.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: color }}
-                />
+                <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: color }} />
                 Sessão Ativa
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
                 {username || "Usuário"}
               </h2>
-              <p className="text-sm text-gray-300 flex items-center justify-center sm:justify-start gap-2">
-                <span>Cor da Sessão:</span>
-                <span className="font-semibold text-white">
-                  {preset ? preset.name : color.toUpperCase()}
-                </span>
-                <span
-                  className="inline-block w-4 h-4 rounded-full border border-white/50 shadow-sm"
-                  style={{ backgroundColor: color }}
-                />
-              </p>
+              {profile?.email && (
+                <p className="text-xs text-slate-300 font-medium">{profile.email}</p>
+              )}
             </div>
           </div>
-          {/* Subtle background glow */}
           <div
             className="absolute -right-16 -bottom-16 w-64 h-64 rounded-full blur-3xl opacity-25 pointer-events-none"
             style={{ backgroundColor: color }}
           />
+        </section>
+
+        {/* SEÇÃO NOVO: Login Social & Contas Conectadas */}
+        <section className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-green-700" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Contas Conectadas & Login Social</h2>
+                <p className="text-xs text-gray-500">
+                  Associe sua conta do Google para entrar com 1 clique sem digitar senha
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm">
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800">Google Account</span>
+                  {profile?.hasGoogleLinked ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      Vinculado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                      Não vinculado
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {profile?.hasGoogleLinked
+                    ? `Conectado ao e-mail ${profile.email || ""}`
+                    : "Conecte sua conta do Google para fazer login rapidamente."}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              {profile?.hasGoogleLinked ? (
+                <button
+                  type="button"
+                  onClick={handleUnlinkGoogle}
+                  disabled={linkingGoogle}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-white text-red-600 hover:bg-red-50 text-xs font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                >
+                  <Unlink className="h-3.5 w-3.5" />
+                  <span>Desvincular</span>
+                </button>
+              ) : (
+                <LinkGoogleButton
+                  onSuccess={handleLinkGoogle}
+                  onError={setError}
+                  loading={linkingGoogle}
+                />
+              )}
+            </div>
+          </div>
         </section>
 
         {/* Seção da Cor do Perfil da Sessão */}
@@ -250,9 +374,7 @@ export default function PerfilPage() {
             <div>
               <div className="flex items-center gap-2">
                 <Palette className="h-5 w-5 text-green-700" />
-                <h2 className="text-xl font-bold text-gray-800">
-                  Cor de Perfil da Sessão
-                </h2>
+                <h2 className="text-xl font-bold text-gray-800">Cor de Perfil da Sessão</h2>
               </div>
               <p className="text-sm text-gray-500 mt-1">
                 Escolha a cor de fundo do seu avatar e destaques do perfil para a sua sessão atual
@@ -278,91 +400,39 @@ export default function PerfilPage() {
             </div>
           )}
 
-          {/* Grid de Paleta Predefinida */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">
-              Paleta de Cores
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {COLOR_PRESETS.map((p) => {
-                const isSelected =
-                  color.toLowerCase() === p.hex.toLowerCase();
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleSelectPreset(p.hex, p.name)}
-                    className={`relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-200 ${
-                      isSelected
-                        ? "border-green-600 bg-green-50/50 shadow-md ring-2 ring-green-600/30 scale-[1.02]"
-                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {COLOR_PRESETS.map((p) => {
+              const isSelected = color.toLowerCase() === p.hex.toLowerCase();
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleSelectPreset(p.hex, p.name)}
+                  className={`relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-200 ${
+                    isSelected
+                      ? "border-green-600 bg-green-50/50 shadow-md ring-2 ring-green-600/30 scale-[1.02]"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex-shrink-0 border border-black/10 shadow-sm flex items-center justify-center text-white"
+                    style={{ background: `linear-gradient(135deg, ${p.hex}, ${p.secondaryHex})` }}
                   >
-                    <div
-                      className="w-8 h-8 rounded-full flex-shrink-0 border border-black/10 shadow-sm flex items-center justify-center text-white"
-                      style={{
-                        background: `linear-gradient(135deg, ${p.hex}, ${p.secondaryHex})`,
-                      }}
-                    >
-                      {isSelected && <Check className="h-4 w-4 drop-shadow" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-gray-800 truncate">
-                        {p.name}
-                      </p>
-                      <p className="text-[10px] text-gray-400 font-mono">
-                        {p.hex}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Seletor de Cor Personalizada HEX */}
-          <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                Cor Personalizada (HEX)
-              </label>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Escolha qualquer cor personalizada utilizando o seletor
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex items-center">
-                <input
-                  type="color"
-                  value={customHex.startsWith("#") ? customHex : "#10b981"}
-                  onChange={handleCustomHexChange}
-                  className="w-10 h-10 rounded-xl cursor-pointer border border-gray-300 p-0.5 bg-white shadow-sm"
-                  title="Abrir seletor de cor"
-                />
-              </div>
-
-              <input
-                type="text"
-                value={customHex}
-                onChange={(e) => {
-                  setCustomHex(e.target.value);
-                  if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
-                    setColor(e.target.value);
-                  }
-                }}
-                placeholder="#10B981"
-                className="w-32 p-2.5 border border-gray-300 rounded-xl text-sm font-mono focus:outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
-              />
-            </div>
+                    {isSelected && <Check className="h-4 w-4 drop-shadow" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-gray-800 truncate">{p.name}</p>
+                    <p className="text-[10px] text-gray-400 font-mono">{p.hex}</p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
 
         {/* Formulário de Nome de Usuário */}
         <section className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
-          <h2 className="text-xl font-bold text-gray-800">
-            Nome de usuário
-          </h2>
+          <h2 className="text-xl font-bold text-gray-800">Nome de usuário</h2>
           <form onSubmit={onSaveUsername} className="flex flex-col sm:flex-row gap-3">
             <input
               value={username}
@@ -374,7 +444,7 @@ export default function PerfilPage() {
             <button
               type="submit"
               disabled={savingName}
-              className="px-6 py-3 bg-green-800 text-white font-medium rounded-xl hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm"
+              className="px-6 py-3 bg-green-800 text-white font-medium rounded-xl hover:bg-green-700 transition-colors disabled:opacity-60 text-sm shadow-sm"
             >
               {savingName ? "Salvando..." : "Salvar nome"}
             </button>
@@ -383,9 +453,7 @@ export default function PerfilPage() {
 
         {/* Formulário de Troca de Senha */}
         <section className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
-          <h2 className="text-xl font-bold text-gray-800">
-            Trocar senha
-          </h2>
+          <h2 className="text-xl font-bold text-gray-800">Trocar senha</h2>
           <form onSubmit={onChangePassword} className="flex flex-col gap-4">
             <input
               type="password"
@@ -414,7 +482,7 @@ export default function PerfilPage() {
             <button
               type="submit"
               disabled={changingPassword}
-              className="px-6 py-3 bg-green-800 text-white font-medium rounded-xl hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-sm shadow-sm self-start"
+              className="px-6 py-3 bg-green-800 text-white font-medium rounded-xl hover:bg-green-700 transition-colors disabled:opacity-60 text-sm shadow-sm self-start"
             >
               {changingPassword ? "Atualizando..." : "Atualizar senha"}
             </button>
@@ -425,4 +493,10 @@ export default function PerfilPage() {
   );
 }
 
-
+export default function PerfilPage() {
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <PerfilContent />
+    </GoogleOAuthProvider>
+  );
+}
