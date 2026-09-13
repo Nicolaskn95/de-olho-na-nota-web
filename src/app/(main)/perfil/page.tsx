@@ -11,6 +11,7 @@ import {
   UserProfileResponse,
 } from "@/lib/auth-api";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PageBackgroundSelector } from "@/components/PageBackgroundSelector";
 import {
   COLOR_PRESETS,
   DEFAULT_PROFILE_COLOR,
@@ -256,12 +257,12 @@ function PerfilContent() {
   };
 
   return (
-    <main className="min-h-screen py-6 sm:py-10 bg-gray-50">
+    <main className="min-h-screen py-6 sm:py-10 bg-transparent">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
         <header className="text-center">
           <h1 className="text-3xl font-bold text-green-800 mb-2">Perfil do Usuário</h1>
           <p className="text-gray-600">
-            Gerencie suas credenciais, segurança e contas conectadas
+            Gerencie suas credenciais, segurança e estilo da sua conta
           </p>
         </header>
 
@@ -430,6 +431,9 @@ function PerfilContent() {
             })}
           </div>
         </section>
+
+        {/* Seção Plano de Fundo das Páginas */}
+        <PageBackgroundSelector />
 
         {/* Formulário de Nome de Usuário */}
         <section className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">

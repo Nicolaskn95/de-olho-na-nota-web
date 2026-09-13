@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Palette, Settings, User } from "lucide-react";
+import { Image as ImageIcon, LogOut, Palette, Settings, User } from "lucide-react";
 import { clearSession, getAuthUser } from "@/lib/auth-api";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useSessionProfileColor } from "@/lib/profile-color";
@@ -82,6 +82,15 @@ export function ProfileMenu() {
             >
               <Palette className="h-4 w-4 text-white/70 group-hover:text-white" />
               <span>Cor do Perfil</span>
+            </Link>
+
+            <Link
+              href="/configuracoes"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/95 hover:bg-white/15 transition-colors group"
+            >
+              <ImageIcon className="h-4 w-4 text-white/70 group-hover:text-white" />
+              <span>Plano de Fundo</span>
             </Link>
 
             <Link

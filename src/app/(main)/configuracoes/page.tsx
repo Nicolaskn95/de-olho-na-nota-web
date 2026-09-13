@@ -2,21 +2,25 @@
 
 import { Categorias } from "@/components/Categorias";
 import { Estabelecimentos } from "@/components/Estabelecimentos";
+import { PageBackgroundSelector } from "@/components/PageBackgroundSelector";
 
 export default function ConfiguracoesPage() {
   return (
-    <main className="min-h-screen py-4 sm:py-8 bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <header className="text-center mb-10">
+    <main className="min-h-screen py-4 sm:py-8 bg-transparent">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
+        <header className="text-center mb-6">
           <h1 className="text-3xl font-bold text-green-800 mb-2">
             Configurações
           </h1>
           <p className="text-gray-600">
-            Categorias de produtos e nomes dos estabelecimentos
+            Personalize a aparência, categorias e estabelecimentos do seu sistema
           </p>
         </header>
 
-        <section className="mb-12">
+        {/* Seção Plano de Fundo das Páginas */}
+        <PageBackgroundSelector />
+
+        <section className="mb-10">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
             Categorias
           </h2>
@@ -33,4 +37,5 @@ export default function ConfiguracoesPage() {
     </main>
   );
 }
+
 
