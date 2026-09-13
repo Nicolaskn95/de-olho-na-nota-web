@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ClipboardList } from "lucide-react";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { useSessionProfileColor } from "@/lib/profile-color";
 
@@ -23,6 +23,7 @@ export function MainNav() {
       { href: "/notasfiscais", label: "Notas Fiscais" },
       { href: "/produtos", label: "Produtos" },
       { href: "/financeiro", label: "Financeiro" },
+      { href: "/lista-compras", label: "Lista de Compras" },
     ],
     []
   );
