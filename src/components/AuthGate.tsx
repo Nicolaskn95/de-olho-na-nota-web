@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearSession, getAccessToken } from "@/lib/auth-api";
+import { Loader } from "./Loader";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001").replace(/\/$/, "");
 
@@ -114,7 +115,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full" />
+        <Loader />
       </div>
     );
   }

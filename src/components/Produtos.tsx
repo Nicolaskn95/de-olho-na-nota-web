@@ -5,6 +5,7 @@ import { getAuthHeaders } from "@/lib/auth-api";
 import type { NotaFiscal } from "@/interface/NotaFiscal/INotaFiscal";
 import type { Produto } from "@/interface/Produto/IProduto";
 import type { Categoria, Prefixo } from "@/interface/Prefixo/IPrefixo";
+import { Loader } from "@/components/Loader";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -625,8 +626,8 @@ export function Produtos() {
   if (carregando) {
     return (
       <div className="max-w-6xl mx-auto p-6">
-        <div className="text-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4" />
+        <div className="text-center py-12 flex flex-col items-center justify-center">
+          <Loader className="mb-4" />
           <p className="text-gray-600">Carregando produtos...</p>
         </div>
       </div>

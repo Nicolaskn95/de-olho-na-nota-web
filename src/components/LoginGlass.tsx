@@ -13,6 +13,7 @@ import {
   persistSession,
   registerRequest,
 } from "@/lib/auth-api";
+import { Loader } from "./Loader";
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -208,7 +209,7 @@ function LoginFormContent() {
   if (checkingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#002545]">
-        <div className="h-9 w-9 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+        <Loader />
       </div>
     );
   }

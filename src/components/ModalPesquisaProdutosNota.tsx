@@ -6,6 +6,7 @@ import { Categoria, Prefixo } from '@/interface/Prefixo/IPrefixo'
 import { NotaFiscal } from '@/interface/NotaFiscal/INotaFiscal'
 import { Search, ShoppingBag, Calendar, Store, Tag, X, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
+import { Loader } from '@/components/Loader'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -201,8 +202,8 @@ export function ModalPesquisaProdutosNota({
         {/* Lista de Resultados */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {carregando ? (
-            <div className="py-12 text-center text-gray-500">
-              <div className="animate-spin w-7 h-7 border-3 border-green-600 border-t-transparent rounded-full mx-auto mb-3" />
+            <div className="py-12 text-center text-gray-500 flex flex-col items-center justify-center">
+              <Loader className="mb-3" size="sm" />
               Buscando produtos nas notas fiscais...
             </div>
           ) : erro ? (

@@ -8,6 +8,7 @@ import type {
 } from "@/interface/NotaFiscal/INotaFiscal";
 import type { Categoria, Prefixo } from "@/interface/Prefixo/IPrefixo";
 import type { Produto } from "@/interface/Produto/IProduto";
+import { Loader } from "@/components/Loader";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -153,8 +154,8 @@ export function Dashboard() {
   if (carregando) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4" />
+        <div className="text-center py-12 flex flex-col items-center justify-center">
+          <Loader className="mb-4" />
           <p className="text-gray-600">Carregando notas fiscais...</p>
         </div>
       </div>

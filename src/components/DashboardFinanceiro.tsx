@@ -33,6 +33,7 @@ import {
 import { Categoria, Prefixo } from "@/interface/Prefixo/IPrefixo";
 import { NotaFiscal } from "@/interface/NotaFiscal/INotaFiscal";
 import { DuracaoMedia } from "./DuracaoMedia";
+import { Loader } from "@/components/Loader";
 
 ChartJS.register(
   CategoryScale,
@@ -302,8 +303,8 @@ export function DashboardFinanceiro() {
   if (carregando) {
     return (
       <div className="max-w-6xl mx-auto p-6">
-        <div className="text-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4" />
+        <div className="text-center py-12 flex flex-col items-center justify-center">
+          <Loader className="mb-4" />
           <p className="text-gray-600">Carregando dados...</p>
         </div>
       </div>
