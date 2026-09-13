@@ -21,7 +21,8 @@ import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const GOOGLE_CLIENT_ID =
-  process.env.GOOGLE_CLIENT_ID;
+  process.env.GOOGLE_CLIENT_ID ||
+  "743020408271-ge3g4tooe22eb2m83vsek8iuvfedjhrj.apps.googleusercontent.com";
 
 function LinkGoogleButton({
   onSuccess,
@@ -495,7 +496,7 @@ function PerfilContent() {
 
 export default function PerfilPage() {
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || ""}>
       <PerfilContent />
     </GoogleOAuthProvider>
   );
