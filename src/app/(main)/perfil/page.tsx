@@ -20,8 +20,7 @@ import { Check, Palette, RotateCcw, Sparkles, Shield, Unlink, Link as LinkIcon, 
 import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-const GOOGLE_CLIENT_ID =
-  process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID: string = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
 function LinkGoogleButton({
   onSuccess,

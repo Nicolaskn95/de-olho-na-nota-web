@@ -14,8 +14,7 @@ import {
   registerRequest,
 } from "@/lib/auth-api";
 
-const GOOGLE_CLIENT_ID =
-  process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID: string = process.env.GOOGLE_CLIENT_ID || "";
 
 type Mode = "login" | "register";
 
