@@ -44,6 +44,67 @@ export async function loginRequest(
   return res.json() as Promise<LoginResponse>;
 }
 
+export async function googleLoginRequest(
+  idToken: string,
+  remember: boolean,
+): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE}/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken, remember }),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res));
+  }
+  return res.json() as Promise<LoginResponse>;
+}
+
+export type UserProfileResponse = {
+  id: string;
+  username: string;
+  email: string | null;
+  googleId: string | null;
+  avatarUrl: string | null;
+  hasGoogleLinked: boolean;
+  hasPassword: boolean;
+};
+
+export async function fetchUserProfile(): Promise<UserProfileResponse> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    method: "GET",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res));
+  }
+  return res.json() as Promise<UserProfileResponse>;
+}
+
+export async function linkGoogleRequest(
+  idToken: string,
+): Promise<{ ok: boolean; email?: string }> {
+  const res = await fetch(`${API_BASE}/auth/link-google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ idToken }),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res));
+  }
+  return res.json();
+}
+
+export async function unlinkGoogleRequest(): Promise<{ ok: boolean }> {
+  const res = await fetch(`${API_BASE}/auth/unlink-google`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res));
+  }
+  return res.json();
+}
+
 export async function registerRequest(
   username: string,
   password: string,

@@ -1,20 +1,98 @@
 "use client";
 
-import { ArrowLeftRight, Eye, EyeOff, Lock, User } from "lucide-react";
-import Link from "next/link";
+import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck, PiggyBank, CheckCircle } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
 import {
   getAccessToken,
   getRememberPreference,
   loginRequest,
+  googleLoginRequest,
   persistSession,
   registerRequest,
 } from "@/lib/auth-api";
 
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID;
+
 type Mode = "login" | "register";
 
-export function LoginGlass() {
+function GoogleButtonContent({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="group relative flex w-full h-12 items-center justify-center gap-3.5 rounded-xl border border-slate-200/80 bg-white px-6 font-semibold text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-md active:scale-[0.99] disabled:opacity-60"
+    >
+      {/* Ícone oficial do Google */}
+      <svg className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24">
+        <path
+          fill="#4285F4"
+          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+        />
+        <path
+          fill="#EA4335"
+          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+        />
+      </svg>
+      <span className="text-sm font-semibold text-slate-800">
+        {loading ? "Autenticando..." : "Continuar com o Google"}
+      </span>
+      <span className="absolute right-4 rounded bg-emerald-100/90 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+        Rápido
+      </span>
+    </button>
+  );
+}
+
+function CustomGoogleLoginButton({
+  onSuccess,
+  onError,
+  loading,
+}: {
+  onSuccess: (idToken: string) => void;
+  onError: (err: string) => void;
+  loading: boolean;
+}) {
+  // Configuração do login via Google OAuth Popup
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        // Tenta obter as credenciais/userInfo através do access_token
+        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const userInfo = await res.json();
+        
+        // Se temos o access_token, passamos via token especial ou tratamos via backend
+        // Caso tenhamos tokenResponse.access_token, fazemos a troca ou passamos o token
+        if (tokenResponse.access_token) {
+          onSuccess(tokenResponse.access_token);
+        }
+      } catch {
+        onError("Falha ao obter perfil do Google");
+      }
+    },
+    onError: () => {
+      onError("Login com Google cancelado ou falhou");
+    },
+  });
+
+  return <GoogleButtonContent onClick={() => handleGoogleLogin()} loading={loading} />;
+}
+
+function LoginFormContent() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [username, setUsername] = useState("");
@@ -40,6 +118,49 @@ export function LoginGlass() {
     }
     setCheckingSession(false);
   }, [router, rememberReady]);
+
+  // Google GIS Prompt Native
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!document.getElementById("google-gsi-script")) {
+      const script = document.createElement("script");
+      script.id = "google-gsi-script";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  const handleGoogleSuccess = async (tokenOrCredential: string) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const data = await googleLoginRequest(tokenOrCredential, remember);
+      persistSession(data, remember);
+      router.push("/notasfiscais");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao entrar com Google");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const triggerNativeGooglePrompt = () => {
+    const win = window as any;
+    if (win.google?.accounts?.id) {
+      win.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response: { credential?: string }) => {
+          if (response.credential) {
+            await handleGoogleSuccess(response.credential);
+          }
+        },
+      });
+      win.google.accounts.id.prompt();
+    }
+  };
 
   const toggleMode = () => {
     setMode((m) => (m === "login" ? "register" : "login"));
@@ -85,290 +206,262 @@ export function LoginGlass() {
 
   if (checkingSession) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#e8e4f5]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-[#002545]">
+        <div className="h-9 w-9 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#e8e4f5] text-slate-900">
-      <div
-        className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-fuchsia-400/55 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute right-[-4rem] top-10 h-80 w-80 rounded-full bg-violet-500/45 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute bottom-10 left-1/3 h-64 w-64 rounded-full bg-orange-300/50 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute bottom-[-3rem] right-1/4 h-72 w-72 rounded-full bg-teal-400/40 blur-3xl"
-        aria-hidden
-      />
+    <main className="relative w-full min-h-screen bg-[#002545] flex flex-col justify-center items-center font-sans antialiased overflow-hidden">
+      {/* Imagem de Fundo para Mobile & Background de Telas Menores */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/supermarket-bg.jpg"
+          alt="Supermercado Fundo"
+          fill
+          priority
+          className="object-cover object-center scale-105"
+        />
+        {/* Overlay Escuro com Gradiente Marinho (#002545) & Efeito Blur para Mobile */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-[#002545]/95 via-[#0e3b64]/90 to-[#002545]/80 backdrop-blur-[3px]" />
+      </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl items-start justify-center px-4 py-4 sm:items-center sm:px-6 sm:py-10">
-        <div
-          className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/30 bg-white/20 shadow-[0_25px_80px_-20px_rgba(79,70,229,0.35)] backdrop-blur-[20px] backdrop-saturate-[180%] sm:rounded-[40px] md:flex-row md:min-h-[460px]"
-          style={{ WebkitBackdropFilter: "blur(20px) saturate(180%)" }}
-        >
-          <div className="absolute left-1/2 top-1/2 z-20 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/90 text-violet-600 shadow-lg md:flex">
-            <button
-              type="button"
-              onClick={toggleMode}
-              className="flex h-full w-full items-center justify-center rounded-full transition hover:bg-white"
-              aria-label="Alternar entre login e cadastro"
-            >
-              <ArrowLeftRight className="h-5 w-5" strokeWidth={1.75} />
-            </button>
+      <div className="relative z-10 w-full min-h-screen flex flex-col lg:flex-row bg-transparent">
+        {/* LADO ESQUERDO: Hero Visual & Proposta de Valor (Stitch Desktop Design) */}
+        <div className="relative hidden lg:flex lg:w-7/12 xl:w-3/5 overflow-hidden flex-col justify-between p-12 lg:p-16">
+          {/* Background Imagem Supermercado para Desktop */}
+          <div
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
+            style={{
+              backgroundImage:
+                "url('https://lh3.googleusercontent.com/aida-public/AB6AXuA3NhP2A1HC5DeZm_rs7lfz-oh5U3yb7-1lKWL58UTvzXxp-DL6knVOpTOUovZKOi7MUZkkI4xBkJG2EFgpNuFREbxepJmHIbGF_GYXJGwBzgrAXvhiS0oVvn6UOLiaJlsL1AP5r7MmhYJd2Inz0lCVbzvXdIIfQZ_bKC4OiijKP5Dpzk_3hNfSxLIc0xGYifsMevK-Br2e7mMivUpGe_jYshHk20s6SBd6kMJOgpmeAj2mXxwnUaO_SveQeZuBYVJncgo')",
+            }}
+          />
+          {/* Overlay Gradiente Azul Marinho Oficial da Marca (#002545) */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#002545]/95 via-[#0e3b64]/85 to-[#002545]/70 backdrop-blur-[2px]" />
+          
+          {/* Luzes decorativas de fundo */}
+          <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-emerald-500/20 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-12 right-12 h-80 w-80 rounded-full bg-blue-400/15 blur-3xl pointer-events-none" />
+
+          {/* Conteúdo Central & Proposta de Valor */}
+          <div className="relative z-10 max-w-xl my-auto py-12 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-semibold text-xs border border-emerald-400/30 shadow-sm backdrop-blur-md">
+              <PiggyBank className="h-4 w-4 text-emerald-400" />
+              <span>Controle inteligente de gastos domésticos</span>
+            </div>
+            
+            <h1 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Economize de verdade em cada ida ao supermercado.
+            </h1>
+            
+            <p className="text-base text-slate-200/90 leading-relaxed max-w-lg">
+              Escaneie suas notas fiscais via QR Code, acompanhe o histórico detalhado de preços por produto e compare redes de supermercados com total transparência.
+            </p>
+
+            <div className="pt-4 flex items-center gap-4 text-xs font-medium text-slate-300">
+              <div className="flex items-center gap-2 bg-white/10 px-3 py-2 rounded-xl backdrop-blur-md">
+                <CheckCircle className="h-4 w-4 text-emerald-400" />
+                <span>NFC-e Automatizado</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/10 px-3 py-2 rounded-xl backdrop-blur-md">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                <span>Dados Auditados</span>
+              </div>
+            </div>
           </div>
 
-          <section
-            className={`relative flex flex-1 flex-col justify-between gap-6 px-5 py-6 sm:px-8 sm:py-8 md:px-10 md:py-10 ${
-              isLogin
-                ? "bg-gradient-to-b from-violet-100/55 to-orange-100/45"
-                : "bg-gradient-to-b from-orange-100/45 to-violet-100/55 order-2 md:order-1"
-            }`}
-          >
-            <div className="space-y-2">
-              <p className="text-xs font-light uppercase tracking-[0.25em] text-slate-600/90">
-                {isLogin ? "bem vindo" : "olá de novo"}
-              </p>
-              <h2 className="text-xl font-semibold text-[#0f2744] sm:text-2xl">
-                {isLogin ? (
-                  <>
-                    Novo login
-                    <span className="mt-1 block h-0.5 w-12 rounded-full bg-[#0f2744]/35" />
-                  </>
-                ) : (
-                  <>
-                    Já tem conta?
-                    <span className="mt-1 block h-0.5 w-12 rounded-full bg-[#0f2744]/35" />
-                  </>
-                )}
+          {/* Rodapé do Banner */}
+          <div className="relative z-10 flex items-center justify-between text-xs text-slate-300/80 border-t border-white/10 pt-6">
+            <span>© 2026 De Olho Na Nota. Todos os direitos reservados.</span>
+            <span className="font-semibold text-emerald-400">Google Stitch Design Verified</span>
+          </div>
+        </div>
+
+        {/* LADO DIREITO: Painel de Autenticação (Com fundo Glassmorphism no Mobile) */}
+        <div className="w-full lg:w-5/12 xl:w-2/5 flex flex-col justify-center p-4 sm:p-8 lg:p-12 xl:p-16 overflow-y-auto min-h-screen lg:min-h-0 bg-transparent lg:bg-white">
+          <div className="w-full max-w-md mx-auto my-auto py-4 px-6 sm:px-8 lg:p-0 rounded-3xl border border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl lg:shadow-none lg:border-none lg:bg-transparent">
+            {/* Header com a Marca De Olho Na Nota */}
+            <div className="mb-6 text-left pt-2 lg:pt-0">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1b6d24] text-white shadow-md shadow-emerald-900/10">
+                  <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-xl font-extrabold text-[#002545] tracking-tight block">De Olho Na Nota</span>
+                  <span className="text-[11px] font-medium text-slate-500 block -mt-1">Gestão de Compras & Preços</span>
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-1.5">
+                {isLogin ? "Bem-vindo de volta" : "Crie sua conta"}
               </h2>
+              <p className="text-xs sm:text-sm text-slate-500">
+                {isLogin
+                  ? "Acesse sua conta para gerenciar seus cupons e listas."
+                  : "Comece a controlar seus gastos no supermercado hoje mesmo."}
+              </p>
             </div>
-            <div>
+
+            {/* Botão de Autenticação Google SSO */}
+            <div className="mb-5">
+              <CustomGoogleLoginButton
+                onSuccess={handleGoogleSuccess}
+                onError={(msg) => {
+                  triggerNativeGooglePrompt();
+                  setError(msg);
+                }}
+                loading={loading}
+              />
+            </div>
+
+            {/* Divisor Elegante */}
+            <div className="relative my-6 flex items-center justify-center">
+              <div className="w-full h-px bg-slate-200" />
+              <span className="absolute bg-white px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {isLogin ? "ou entre com seu e-mail" : "ou cadastre-se com seu e-mail"}
+              </span>
+            </div>
+
+            {/* Formulário de Autenticação */}
+            <form onSubmit={isLogin ? onLogin : onRegister} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  E-mail ou Usuário
+                </label>
+                <div className="relative rounded-xl border border-slate-200 bg-slate-50/70 shadow-sm transition-all focus-within:border-[#1b6d24] focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-600/10">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="seu.email@exemplo.com"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="block w-full pl-10 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-transparent rounded-xl focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Senha
+                </label>
+                <div className="relative rounded-xl border border-slate-200 bg-slate-50/70 shadow-sm transition-all focus-within:border-[#1b6d24] focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-600/10">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full pl-10 pr-11 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-transparent rounded-xl focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {!isLogin && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Confirmar Senha
+                  </label>
+                  <div className="relative rounded-xl border border-slate-200 bg-slate-50/70 shadow-sm transition-all focus-within:border-[#1b6d24] focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-600/10">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="block w-full pl-10 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-transparent rounded-xl focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isLogin && (
+                <div className="flex items-center justify-between text-xs pt-0.5">
+                  <label className="flex items-center gap-2 font-medium text-slate-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-[#1b6d24] focus:ring-[#1b6d24]"
+                    />
+                    Lembrar de mim
+                  </label>
+                  <button
+                    type="button"
+                    className="font-semibold text-[#002545] hover:text-[#1b6d24] hover:underline"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                </div>
+              )}
+
+              {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-xs font-medium text-red-600">
+                  {error}
+                </div>
+              )}
+
+              {/* Botão Primário (Verde Esmeralda #1b6d24 do Stitch) */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 h-11 sm:h-12 px-6 rounded-xl bg-[#1b6d24] text-white font-semibold text-xs sm:text-sm shadow-md hover:bg-[#15571d] hover:shadow-lg transition-all duration-200 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+                >
+                  <span>{loading ? "Autenticando..." : isLogin ? "Entrar na Conta" : "Criar Conta"}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+
+            {/* Chamada para Cadastro (Card de rodapé do Stitch) */}
+            <div className="mt-6 mb-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-left">
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-slate-900">
+                  {isLogin ? "Novo no De Olho Na Nota?" : "Já possui uma conta?"}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {isLogin ? "Comece a economizar agora mesmo." : "Acesse o painel com seus dados."}
+                </span>
+              </div>
               <button
                 type="button"
-                onClick={() => setMode(isLogin ? "register" : "login")}
-                className="w-full rounded-full border border-white/40 bg-orange-200/50 px-6 py-2.5 text-sm font-medium text-[#7a3d12] shadow-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-orange-200/70 hover:shadow-md active:scale-[0.98] sm:w-auto sm:px-8"
+                onClick={toggleMode}
+                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[#002545] font-semibold text-xs hover:bg-slate-100 shadow-sm transition-colors whitespace-nowrap"
               >
                 {isLogin ? "Criar conta" : "Fazer login"}
               </button>
             </div>
-          </section>
-
-          <section
-            className={`relative flex flex-1 flex-col justify-center gap-5 px-5 py-6 sm:px-8 sm:py-8 md:gap-6 md:px-12 md:py-10 ${
-              isLogin
-                ? "bg-indigo-500/25"
-                : "bg-indigo-500/25 order-1 md:order-2"
-            }`}
-          >
-            <div className="flex justify-end md:absolute md:right-8 md:top-8">
-              <span className="rounded-full bg-pink-200/50 px-4 py-1 text-xs font-medium text-pink-950/80 backdrop-blur-sm">
-                {isLogin ? "Logar" : "Cadastrar"}
-              </span>
-            </div>
-
-            <div className="relative mt-2 min-h-[370px] sm:mt-4 sm:min-h-[395px] md:mt-0">
-              <form
-                onSubmit={onLogin}
-                aria-hidden={!isLogin}
-                className={`absolute inset-0 flex flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-5 ${
-                  isLogin
-                    ? "z-10 translate-x-0 opacity-100"
-                    : "pointer-events-none z-0 translate-x-3 opacity-0"
-                }`}
-              >
-                <p className="text-xs font-light uppercase tracking-[0.25em] text-white/85">
-                  faça login
-                </p>
-                <label className="relative block">
-                  <User
-                    className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-900/50"
-                    aria-hidden
-                  />
-                  <input
-                    className="w-full rounded-full border border-white/50 bg-white/35 py-3 pl-11 pr-4 text-xs font-semibold uppercase tracking-wide text-indigo-950 shadow-inner outline-none ring-white/30 placeholder:text-indigo-900/35 focus:ring-2"
-                    placeholder="usuário"
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                  />
-                </label>
-                <label className="relative block">
-                  <Lock
-                    className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-900/50"
-                    aria-hidden
-                  />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className="w-full rounded-full border border-white/50 bg-white/35 py-3 pl-11 pr-12 text-xs font-semibold uppercase tracking-wide text-indigo-950 shadow-inner outline-none ring-white/30 placeholder:text-indigo-900/35 focus:ring-2"
-                    placeholder="senha"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-indigo-900/55 hover:bg-white/20 hover:text-indigo-950"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={
-                      showPassword ? "Ocultar senha" : "Mostrar senha"
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </label>
-                <div className="flex items-center justify-between gap-4 text-xs text-white/90">
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2 py-1">
-                    <input
-                      type="checkbox"
-                      checked={remember}
-                      onChange={(e) => setRemember(e.target.checked)}
-                      className="h-5 w-5 shrink-0 rounded border-white/60 bg-white/30 text-indigo-700 focus:ring-indigo-300"
-                    />
-                    Lembrar
-                  </label>
-                  <button
-                    type="button"
-                    className="underline decoration-white/60 underline-offset-2 hover:text-white"
-                  >
-                    Esqueceu senha?
-                  </button>
-                </div>
-                {isLogin && error ? (
-                  <p
-                    className="text-center text-xs font-medium text-red-100"
-                    role="alert"
-                  >
-                    {error}
-                  </p>
-                ) : null}
-                <button
-                  type="submit"
-                  disabled={loading || !isLogin}
-                  className="w-full rounded-full bg-[#0f2744] py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-[#162f52] hover:shadow-xl active:scale-[0.99] disabled:translate-y-0 disabled:shadow-lg disabled:opacity-60"
-                >
-                  {loading && isLogin ? "Entrando…" : "Entrar"}
-                </button>
-              </form>
-
-              <form
-                onSubmit={onRegister}
-                aria-hidden={isLogin}
-                className={`absolute inset-0 flex flex-col gap-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:gap-5 ${
-                  isLogin
-                    ? "pointer-events-none z-0 -translate-x-3 opacity-0"
-                    : "z-10 translate-x-0 opacity-100"
-                }`}
-              >
-                <p className="text-xs font-light uppercase tracking-[0.25em] text-white/85">
-                  criar conta
-                </p>
-                <label className="relative block">
-                  <User
-                    className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-900/50"
-                    aria-hidden
-                  />
-                  <input
-                    className="w-full rounded-full border border-white/50 bg-white/35 py-3 pl-11 pr-4 text-xs font-semibold uppercase tracking-wide text-indigo-950 shadow-inner outline-none ring-white/30 placeholder:text-indigo-900/35 focus:ring-2"
-                    placeholder="usuário"
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    minLength={3}
-                  />
-                </label>
-                <label className="relative block">
-                  <Lock
-                    className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-900/50"
-                    aria-hidden
-                  />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className="w-full rounded-full border border-white/50 bg-white/35 py-3 pl-11 pr-12 text-xs font-semibold uppercase tracking-wide text-indigo-950 shadow-inner outline-none ring-white/30 placeholder:text-indigo-900/35 focus:ring-2"
-                    placeholder="senha"
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-indigo-900/55 hover:bg-white/20 hover:text-indigo-950"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={
-                      showPassword ? "Ocultar senha" : "Mostrar senha"
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </label>
-                <label className="relative block">
-                  <Lock
-                    className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-900/50"
-                    aria-hidden
-                  />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className="w-full rounded-full border border-white/50 bg-white/35 py-3 pl-11 pr-4 text-xs font-semibold uppercase tracking-wide text-indigo-950 shadow-inner outline-none ring-white/30 placeholder:text-indigo-900/35 focus:ring-2"
-                    placeholder="confirmar senha"
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </label>
-                <div className="flex items-center gap-2 text-xs text-white/90">
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2 py-1">
-                    <input
-                      type="checkbox"
-                      checked={remember}
-                      onChange={(e) => setRemember(e.target.checked)}
-                      className="h-5 w-5 shrink-0 rounded border-white/60 bg-white/30 text-indigo-700 focus:ring-indigo-300"
-                    />
-                    Lembrar após cadastro
-                  </label>
-                </div>
-                {!isLogin && error ? (
-                  <p
-                    className="text-center text-xs font-medium text-red-100"
-                    role="alert"
-                  >
-                    {error}
-                  </p>
-                ) : null}
-                <button
-                  type="submit"
-                  disabled={loading || isLogin}
-                  className="w-full rounded-full bg-[#0f2744] py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-[#162f52] hover:shadow-xl active:scale-[0.99] disabled:translate-y-0 disabled:shadow-lg disabled:opacity-60"
-                >
-                  {loading && !isLogin ? "Criando…" : "Criar e entrar"}
-                </button>
-              </form>
-            </div>
-          </section>
+          </div>
         </div>
       </div>
-    </div>
+    </main>
+  );
+}
+
+export function LoginGlass() {
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <LoginFormContent />
+    </GoogleOAuthProvider>
   );
 }
