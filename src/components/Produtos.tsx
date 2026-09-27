@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { getAuthHeaders } from "@/lib/auth-api";
 import type { NotaFiscal } from "@/interface/NotaFiscal/INotaFiscal";
-import type { Produto } from "@/interface/Produto/IProduto";
+import type { Produto, ProdutoAgrupadoResponse } from "@/interface/Produto/IProduto";
 import type { Categoria, Prefixo } from "@/interface/Prefixo/IPrefixo";
+import { sanitizarDescricaoProduto, gerarChaveCanonica } from "@/lib/sanitizar-produto";
 import { Loader } from "@/components/Loader";
 import {
   Chart as ChartJS,
@@ -53,62 +54,6 @@ ChartJS.register(
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-// ─── Fuzzy Matching ────────────────────────────────────────────────
-function levenshtein(a: string, b: string): number {
-  const m = a.length,
-    n = b.length;
-  if (m === 0) return n;
-  if (n === 0) return m;
-  const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array(n + 1).fill(0)
-  );
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-    }
-  }
-  return dp[m][n];
-}
-
-function normalizeForMatching(name: string): string {
-  return name
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function areSimilar(a: string, b: string): boolean {
-  const na = normalizeForMatching(a);
-  const nb = normalizeForMatching(b);
-  if (na === nb) return true;
-
-  // Check prefix match (first 60% of shorter string)
-  const shorter = na.length <= nb.length ? na : nb;
-  const longer = na.length > nb.length ? na : nb;
-  const prefixLen = Math.max(4, Math.floor(shorter.length * 0.6));
-  if (
-    shorter.length >= 4 &&
-    shorter.substring(0, prefixLen) === longer.substring(0, prefixLen)
-  ) {
-    // If prefix matches, check overall similarity
-    const dist = levenshtein(na, nb);
-    const maxLen = Math.max(na.length, nb.length);
-    return dist / maxLen < 0.35;
-  }
-
-  // Direct distance check for short names
-  if (na.length <= 8 && nb.length <= 8) {
-    return levenshtein(na, nb) <= 2;
-  }
-
-  return false;
-}
-
 // ─── Types ─────────────────────────────────────────────────────────
 
 interface ProdutoOccurrence {
@@ -117,6 +62,7 @@ interface ProdutoOccurrence {
 }
 
 interface ProdutoAgrupado {
+  id?: string;
   nome: string;
   nomes: string[];
   ocorrencias: ProdutoOccurrence[];
@@ -252,8 +198,62 @@ export function Produtos() {
     }
   };
 
-  // ─── Aggregate products with fuzzy matching ────────────────────
+  // Backend grouped products
+  const [produtosBackend, setProdutosBackend] = useState<ProdutoAgrupado[] | null>(null);
+
+  const carregarProdutosAgrupados = useCallback(
+    async (inicio?: string, fim?: string) => {
+      try {
+        const params = new URLSearchParams();
+        if (inicio) params.append("dataInicio", inicio);
+        if (fim) params.append("dataFim", fim);
+        const qs = params.toString() ? `?${params.toString()}` : "";
+
+        const res = await fetch(
+          `${API_URL}/historico-compra/produtos-agrupados${qs}`,
+          { headers: getAuthHeaders() }
+        );
+
+        if (res.ok) {
+          const dados = (await res.json()) as ProdutoAgrupadoResponse[];
+          if (Array.isArray(dados) && dados.length > 0) {
+            const formatados: ProdutoAgrupado[] = dados.map((p) => ({
+              id: p.id,
+              nome: p.nome,
+              nomes: p.nomes,
+              ocorrencias: [],
+              totalGasto: p.totalGasto,
+              totalQuantidade: p.totalQuantidade,
+              vezesComprado: p.vezesComprado,
+              mediaPrecoUnitario: p.mediaPrecoUnitario,
+              ultimoPreco: p.ultimoPreco,
+              ultimaData: p.ultimaData,
+              estabelecimentos: new Map(Object.entries(p.estabelecimentos || {})),
+              precosPorMes: new Map(Object.entries(p.precosPorMes || {})),
+              variacao: p.variacao,
+              categoria: p.categoria as Categoria | null,
+            }));
+            setProdutosBackend(formatados);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Fallback para agrupamento local:", err);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    carregarProdutosAgrupados(dataInicio, dataFim);
+  }, [dataInicio, dataFim, carregarProdutosAgrupados]);
+
+  // ─── Aggregate products with canonical key matching ────────────────────
   const produtosAgrupados = useMemo(() => {
+    if (produtosBackend && produtosBackend.length > 0) {
+      return produtosBackend;
+    }
+
     // Filter notas by date range
     const notasFiltradas = notas.filter((nota) => {
       const d = new Date(nota.dataEmissao);
@@ -266,48 +266,20 @@ export function Produtos() {
       return true;
     });
 
-    // Collect all product occurrences
-    const allOccurrences: ProdutoOccurrence[] = [];
+    // Group by canonical key (EAN or token signature without market prefixes)
+    const groupsMap = new Map<string, ProdutoOccurrence[]>();
     for (const nota of notasFiltradas) {
       if (!nota.produtos) continue;
       for (const produto of nota.produtos) {
-        allOccurrences.push({ produto, nota });
+        const chave = gerarChaveCanonica((produto as any).codigo, produto.nome);
+        const list = groupsMap.get(chave) || [];
+        list.push({ produto, nota });
+        groupsMap.set(chave, list);
       }
     }
 
-    // Group by fuzzy name
     const groups: ProdutoAgrupado[] = [];
-    const assigned = new Set<number>();
-
-    for (let i = 0; i < allOccurrences.length; i++) {
-      if (assigned.has(i)) continue;
-
-      const occ = allOccurrences[i];
-      const group: ProdutoOccurrence[] = [occ];
-      const names = new Set<string>([occ.produto.nome]);
-      assigned.add(i);
-
-      for (let j = i + 1; j < allOccurrences.length; j++) {
-        if (assigned.has(j)) continue;
-        const other = allOccurrences[j];
-
-        // Check if any name in the group is similar
-        let match = false;
-        for (const existingName of names) {
-          if (areSimilar(existingName, other.produto.nome)) {
-            match = true;
-            break;
-          }
-        }
-
-        if (match) {
-          group.push(other);
-          names.add(other.produto.nome);
-          assigned.add(j);
-        }
-      }
-
-      // Build aggregated product
+    for (const [, group] of groupsMap.entries()) {
       const totalGasto = group.reduce(
         (acc, o) => acc + o.produto.valorTotal,
         0
@@ -317,14 +289,12 @@ export function Produtos() {
         0
       );
 
-      // Sort by date to find latest
       const sorted = [...group].sort(
         (a, b) =>
           new Date(b.nota.dataEmissao).getTime() -
           new Date(a.nota.dataEmissao).getTime()
       );
 
-      // Establishment stats
       const estabMap = new Map<
         string,
         { total: number; count: number; ultimoPreco: number }
@@ -342,7 +312,6 @@ export function Produtos() {
         estabMap.set(key, existing);
       }
 
-      // Monthly price stats
       const mesMap = new Map<string, { total: number; count: number }>();
       for (const o of group) {
         const d = new Date(o.nota.dataEmissao);
@@ -353,28 +322,20 @@ export function Produtos() {
         mesMap.set(key, existing);
       }
 
-      const mediaPreco = totalGasto / totalQuantidade;
+      const mediaPreco = totalQuantidade > 0 ? totalGasto / totalQuantidade : 0;
       const ultimoPreco = sorted[0].produto.valorUnitario;
       const variacao =
         mediaPreco > 0 ? ((ultimoPreco - mediaPreco) / mediaPreco) * 100 : null;
 
-      // Use most common name
-      const nameCount = new Map<string, number>();
-      group.forEach((o) => {
-        nameCount.set(
-          o.produto.nome,
-          (nameCount.get(o.produto.nome) || 0) + 1
-        );
-      });
-      const mainName = [...nameCount.entries()].sort(
-        (a, b) => b[1] - a[1]
-      )[0][0];
-
+      const nomesSanitizados = Array.from(
+        new Set(group.map((o) => sanitizarDescricaoProduto(o.produto.nome)))
+      );
+      const mainName = nomesSanitizados[0] || "Produto sem nome";
       const cat = getCategoriaProduto(mainName, prefixos);
 
       groups.push({
         nome: mainName,
-        nomes: [...names],
+        nomes: nomesSanitizados,
         ocorrencias: group,
         totalGasto,
         totalQuantidade,
@@ -389,8 +350,8 @@ export function Produtos() {
       });
     }
 
-    return groups;
-  }, [notas, prefixos, dataInicio, dataFim]);
+    return groups.sort((a, b) => b.totalGasto - a.totalGasto);
+  }, [produtosBackend, notas, prefixos, dataInicio, dataFim]);
 
   // ─── Filter products ──────────────────────────────────────────
   const produtosFiltrados = useMemo(() => {
