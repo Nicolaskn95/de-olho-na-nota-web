@@ -3,7 +3,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { getAuthHeaders } from "@/lib/auth-api";
 import type { NotaFiscal } from "@/interface/NotaFiscal/INotaFiscal";
-import type { Produto, ProdutoAgrupadoResponse } from "@/interface/Produto/IProduto";
+import type {
+  Produto,
+  ProdutoAgrupadoResponse,
+  HistoricoItemCompra,
+} from "@/interface/Produto/IProduto";
 import type { Categoria, Prefixo } from "@/interface/Prefixo/IPrefixo";
 import { sanitizarDescricaoProduto, gerarChaveCanonica } from "@/lib/sanitizar-produto";
 import { Loader } from "@/components/Loader";
@@ -74,6 +78,7 @@ interface ProdutoAgrupado {
   ultimaData: string;
   estabelecimentos: Map<string, { total: number; count: number; ultimoPreco: number }>;
   precosPorMes: Map<string, { total: number; count: number }>;
+  compras: HistoricoItemCompra[];
   variacao: number | null; // % change of last price vs average
   categoria: Categoria | null;
 }
@@ -230,6 +235,7 @@ export function Produtos() {
               ultimaData: p.ultimaData,
               estabelecimentos: new Map(Object.entries(p.estabelecimentos || {})),
               precosPorMes: new Map(Object.entries(p.precosPorMes || {})),
+              compras: p.compras || [],
               variacao: p.variacao,
               categoria: p.categoria as Categoria | null,
             }));
@@ -333,6 +339,14 @@ export function Produtos() {
       const mainName = nomesSanitizados[0] || "Produto sem nome";
       const cat = getCategoriaProduto(mainName, prefixos);
 
+      const comprasDoGrupo: HistoricoItemCompra[] = group.map((o) => ({
+        dataCompra: o.nota.dataEmissao,
+        estabelecimento: o.nota.estabelecimento || "Supermercado",
+        precoUnitario: o.produto.valorUnitario,
+        quantidade: o.produto.quantidade,
+        precoTotal: o.produto.valorTotal,
+      }));
+
       groups.push({
         nome: mainName,
         nomes: nomesSanitizados,
@@ -345,6 +359,7 @@ export function Produtos() {
         ultimaData: sorted[0].nota.dataEmissao,
         estabelecimentos: estabMap,
         precosPorMes: mesMap,
+        compras: comprasDoGrupo,
         variacao,
         categoria: cat,
       });
@@ -417,36 +432,123 @@ export function Produtos() {
       .slice(0, 8);
   }, [busca, produtosAgrupados]);
 
+  // Selected purchase on chart click
+  const [compraSelecionadaNoGrafico, setCompraSelecionadaNoGrafico] =
+    useState<HistoricoItemCompra | null>(null);
+
+  // Chronological purchases for the selected product
+  const historicoComprasGrafico = useMemo(() => {
+    if (!produtoSelecionado) return [];
+    if (produtoSelecionado.compras && produtoSelecionado.compras.length > 0) {
+      return [...produtoSelecionado.compras].sort(
+        (a, b) =>
+          new Date(a.dataCompra).getTime() - new Date(b.dataCompra).getTime()
+      );
+    }
+    // Fallback based on precosPorMes
+    return [...produtoSelecionado.precosPorMes.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([mes, v]) => ({
+        dataCompra: `${mes}-01`,
+        estabelecimento: "Média do Período",
+        precoUnitario: v.total / (v.count || 1),
+        quantidade: v.count,
+        precoTotal: v.total,
+      }));
+  }, [produtoSelecionado]);
+
+  // When selected product changes, pre-select the most recent purchase
+  useEffect(() => {
+    if (historicoComprasGrafico.length > 0) {
+      setCompraSelecionadaNoGrafico(
+        historicoComprasGrafico[historicoComprasGrafico.length - 1]
+      );
+    } else {
+      setCompraSelecionadaNoGrafico(null);
+    }
+  }, [historicoComprasGrafico]);
+
   // ─── Price chart data for selected product ────────────────────
   const chartData = useMemo(() => {
-    if (!produtoSelecionado) return null;
+    if (!produtoSelecionado || historicoComprasGrafico.length === 0) return null;
 
-    const entries = [...produtoSelecionado.precosPorMes.entries()].sort(
-      (a, b) => a[0].localeCompare(b[0])
-    );
-
-    const labels = entries.map(([mes]) => formatMonthLabel(mes));
-    const data = entries.map(([, v]) => v.total / v.count);
+    const labels = historicoComprasGrafico.map((c) => formatDate(c.dataCompra));
+    const data = historicoComprasGrafico.map((c) => c.precoUnitario);
 
     return {
       labels,
       datasets: [
         {
-          label: "Preço Médio Unitário",
+          label: "Preço Unitário",
           data,
           borderColor: "#10b981",
           backgroundColor: "rgba(16, 185, 129, 0.1)",
           fill: true,
-          tension: 0.3,
+          tension: 0.25,
           pointBackgroundColor: "#10b981",
           pointBorderColor: "#fff",
           pointBorderWidth: 2,
-          pointRadius: 5,
-          pointHoverRadius: 7,
+          pointRadius: 6,
+          pointHoverRadius: 9,
+          pointHoverBackgroundColor: "#059669",
         },
       ],
     };
-  }, [produtoSelecionado]);
+  }, [produtoSelecionado, historicoComprasGrafico]);
+
+  // Chart options with click listener to display the purchase establishment
+  const chartOptions = useMemo(() => {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: (_event: any, elements: any[]) => {
+        if (elements && elements.length > 0) {
+          const idx = elements[0].index;
+          if (historicoComprasGrafico[idx]) {
+            setCompraSelecionadaNoGrafico(historicoComprasGrafico[idx]);
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items: any[]) => {
+              const idx = items[0]?.dataIndex;
+              const c = historicoComprasGrafico[idx];
+              if (c) {
+                return `${formatDate(c.dataCompra)} • ${c.estabelecimento}`;
+              }
+              return items[0]?.label || "";
+            },
+            label: (ctx: any) => {
+              const idx = ctx.dataIndex;
+              const c = historicoComprasGrafico[idx];
+              if (c) {
+                return [
+                  `Preço unitário: ${formatCurrency(c.precoUnitario)}`,
+                  `Local: ${c.estabelecimento}`,
+                  `Qtd: ${c.quantidade} un • Total: ${formatCurrency(c.precoTotal)}`,
+                ];
+              }
+              return `Preço: ${formatCurrency(ctx.raw as number)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: (v: any) => `R$ ${(v as number).toFixed(2)}`,
+          },
+          grid: { color: "rgba(0,0,0,0.05)" },
+        },
+        x: {
+          grid: { display: false },
+        },
+      },
+    };
+  }, [historicoComprasGrafico]);
 
   // ─── Categories used in products ──────────────────────────────
   const categoriasUsadas = useMemo(() => {
@@ -919,127 +1021,219 @@ export function Produtos() {
           </div>
 
           {/* Price History Chart */}
-          {chartData && chartData.labels.length > 1 && (
+          {chartData && chartData.labels.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-green-600" />
-                Histórico de Preço (Média Mensal)
-              </h3>
-              <div className="h-64">
-                <Line
-                  data={chartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { display: false },
-                      tooltip: {
-                        callbacks: {
-                          label: (ctx) =>
-                            `Preço médio: ${formatCurrency(ctx.raw as number)}`,
-                        },
-                      },
-                    },
-                    scales: {
-                      y: {
-                        ticks: {
-                          callback: (v) =>
-                            `R$ ${(v as number).toFixed(2)}`,
-                        },
-                        grid: { color: "rgba(0,0,0,0.05)" },
-                      },
-                      x: {
-                        grid: { display: false },
-                      },
-                    },
-                  }}
-                />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                  Evolução de Preço por Compra
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {historicoComprasGrafico.length} registro(s) no período
+                </span>
               </div>
+
+              <div className="h-64">
+                <Line data={chartData} options={chartOptions} />
+              </div>
+
+              {/* Informação do estabelecimento ao clicar ou selecionar data no gráfico */}
+              {compraSelecionadaNoGrafico ? (
+                <div className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-blue-100 text-blue-700">
+                      <Store className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                          Compra selecionada no gráfico
+                        </span>
+                        <span className="text-xs text-gray-500 hidden sm:inline">
+                          (clique em outros pontos para alternar)
+                        </span>
+                      </div>
+                      <p className="text-base font-bold text-gray-900 mt-1">
+                        {compraSelecionadaNoGrafico.estabelecimento}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-600">
+                        <span className="flex items-center gap-1 font-medium text-gray-700">
+                          <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                          {formatDate(compraSelecionadaNoGrafico.dataCompra)}
+                        </span>
+                        <span>•</span>
+                        <span>Quantidade: <strong>{compraSelecionadaNoGrafico.quantidade} un.</strong></span>
+                        <span>•</span>
+                        <span>Total da compra: <strong>{formatCurrency(compraSelecionadaNoGrafico.precoTotal)}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="sm:text-right sm:border-l sm:border-blue-200 sm:pl-5">
+                    <span className="text-xs text-gray-500 font-medium">Preço pago nesta data</span>
+                    <p className="text-xl font-extrabold text-blue-700">
+                      {formatCurrency(compraSelecionadaNoGrafico.precoUnitario)}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mt-3 text-center italic">
+                  💡 Clique em qualquer ponto de data no gráfico para visualizar onde e quanto você pagou.
+                </p>
+              )}
             </div>
           )}
 
           {/* Establishment Comparison */}
-          {produtoSelecionado.estabelecimentos.size > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <Store className="w-5 h-5 text-blue-600" />
-                Comparativo por Estabelecimento
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left p-3 font-medium text-gray-600 rounded-tl-lg">
-                        Estabelecimento
-                      </th>
-                      <th className="text-right p-3 font-medium text-gray-600">
-                        Compras
-                      </th>
-                      <th className="text-right p-3 font-medium text-gray-600">
-                        Preço Médio
-                      </th>
-                      <th className="text-right p-3 font-medium text-gray-600">
-                        Último Preço
-                      </th>
-                      <th className="text-right p-3 font-medium text-gray-600 rounded-tr-lg">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...produtoSelecionado.estabelecimentos.entries()]
-                      .sort((a, b) => a[1].total / a[1].count - b[1].total / b[1].count)
-                      .map(([estab, data], idx, arr) => {
-                        const avg = data.total / data.count;
-                        const isCheapest = idx === 0 && arr.length > 1;
-                        const isMostExpensive =
-                          idx === arr.length - 1 && arr.length > 1;
+          {produtoSelecionado.estabelecimentos.size > 0 && (() => {
+            const estabList = [...produtoSelecionado.estabelecimentos.entries()]
+              .map(([estab, data]) => ({
+                estab,
+                data,
+                avg: data.total / (data.count || 1),
+              }))
+              .sort((a, b) => a.avg - b.avg);
+
+            const menor = estabList[0];
+            const maior = estabList[estabList.length - 1];
+            const temComparacao = estabList.length > 1;
+            const diffValor = maior.avg - menor.avg;
+            const diffPct = menor.avg > 0 ? (diffValor / menor.avg) * 100 : 0;
+            const economiaEstimada = Math.max(
+              0,
+              produtoSelecionado.totalGasto - menor.avg * produtoSelecionado.totalQuantidade
+            );
+
+            return (
+              <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <Store className="w-5 h-5 text-blue-600" />
+                    Comparativo entre Estabelecimentos
+                  </h3>
+                  {temComparacao && (
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 self-start sm:self-auto">
+                      <TrendingDown className="w-3.5 h-3.5 text-blue-600" />
+                      {estabList.length} mercados comparados
+                    </span>
+                  )}
+                </div>
+
+                {/* Destaques comparativos entre mercados */}
+                {temComparacao && (
+                  <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+                      <p className="font-semibold text-emerald-800 flex items-center gap-1.5 mb-1">
+                        <ArrowDownRight className="w-4 h-4 text-emerald-600" />
+                        Melhor Escolha: {menor.estab}
+                      </p>
+                      <p className="text-emerald-700">
+                        Preço médio mais em conta: <strong>{formatCurrency(menor.avg)}</strong>. Se tivesse comprado tudo aqui, sua economia estimada seria de <strong>{formatCurrency(economiaEstimada)}</strong>.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                      <p className="font-semibold text-amber-800 flex items-center gap-1.5 mb-1">
+                        <ArrowUpRight className="w-4 h-4 text-amber-600" />
+                        Diferença entre o Mais Barato e Mais Caro
+                      </p>
+                      <p className="text-amber-700">
+                        O <strong>{maior.estab}</strong> foi <strong>{diffPct.toFixed(1)}% mais caro</strong> (+{formatCurrency(diffValor)} por unidade) em comparação ao {menor.estab}.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left p-3 font-medium text-gray-600 rounded-tl-lg">
+                          Estabelecimento
+                        </th>
+                        <th className="text-right p-3 font-medium text-gray-600">
+                          Preço Médio
+                        </th>
+                        <th className="text-center p-3 font-medium text-gray-600">
+                          Comparação vs Menor
+                        </th>
+                        <th className="text-right p-3 font-medium text-gray-600">
+                          Último Preço
+                        </th>
+                        <th className="text-right p-3 font-medium text-gray-600">
+                          Compras
+                        </th>
+                        <th className="text-right p-3 font-medium text-gray-600 rounded-tr-lg">
+                          Total Gasto
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {estabList.map((item, idx) => {
+                        const isCheapest = idx === 0 && temComparacao;
+                        const isMostExpensive = idx === estabList.length - 1 && temComparacao;
+                        const diffVsMenor = item.avg - menor.avg;
+                        const pctVsMenor = menor.avg > 0 ? (diffVsMenor / menor.avg) * 100 : 0;
+
                         return (
                           <tr
-                            key={estab}
+                            key={item.estab}
                             className={`border-t border-gray-100 ${
                               isCheapest
-                                ? "bg-green-50/50"
+                                ? "bg-emerald-50/40"
                                 : isMostExpensive
-                                ? "bg-red-50/30"
+                                ? "bg-rose-50/30"
                                 : ""
                             }`}
                           >
                             <td className="p-3 text-gray-800 font-medium">
                               <div className="flex items-center gap-2">
-                                {estab}
+                                <span>{item.estab}</span>
                                 {isCheapest && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold border border-emerald-300">
                                     Mais barato
                                   </span>
                                 )}
                                 {isMostExpensive && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-semibold border border-rose-300">
                                     Mais caro
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="p-3 text-right text-gray-600">
-                              {data.count}x
+                            <td className="p-3 text-right font-bold text-gray-800">
+                              {formatCurrency(item.avg)}
                             </td>
-                            <td className="p-3 text-right font-medium text-gray-800">
-                              {formatCurrency(avg)}
+                            <td className="p-3 text-center">
+                              {isCheapest ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100/80 text-emerald-800">
+                                  Menor preço (Base)
+                                </span>
+                              ) : temComparacao ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-amber-100/80 text-amber-800">
+                                  +{pctVsMenor.toFixed(1)}% (+{formatCurrency(diffVsMenor)})
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
                             </td>
                             <td className="p-3 text-right text-gray-600">
-                              {formatCurrency(data.ultimoPreco)}
+                              {formatCurrency(item.data.ultimoPreco)}
+                            </td>
+                            <td className="p-3 text-right text-gray-600">
+                              {item.data.count}x
                             </td>
                             <td className="p-3 text-right font-semibold text-gray-800">
-                              {formatCurrency(data.total)}
+                              {formatCurrency(item.data.total)}
                             </td>
                           </tr>
                         );
                       })}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 

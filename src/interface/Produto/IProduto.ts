@@ -18,6 +18,14 @@ export interface PrecoMesStats {
   count: number
 }
 
+export interface HistoricoItemCompra {
+  dataCompra: string
+  estabelecimento: string
+  precoUnitario: number
+  quantidade: number
+  precoTotal: number
+}
+
 export interface ProdutoAgrupadoResponse {
   id: string
   nome: string
@@ -30,6 +38,7 @@ export interface ProdutoAgrupadoResponse {
   ultimaData: string
   estabelecimentos: Record<string, EstabelecimentoItemStats>
   precosPorMes: Record<string, PrecoMesStats>
+  compras?: HistoricoItemCompra[]
   variacao: number | null
   categoria: {
     _id: string
