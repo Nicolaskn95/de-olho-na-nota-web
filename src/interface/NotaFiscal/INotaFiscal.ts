@@ -1,5 +1,11 @@
 import { Produto } from '../Produto/IProduto'
 
+export interface TributosDetalhados {
+  federal?: number
+  estadual?: number
+  municipal?: number
+}
+
 export interface NotaFiscal {
   _id: string
   chaveAcesso: string
@@ -8,6 +14,11 @@ export interface NotaFiscal {
   estabelecimento: string
   valorTotal: number
   valorPago: number
+  formaPagamento?: string
+  tipoPagamento?: string
+  cartaoUsado?: string
+  valorTributos?: number
+  tributosDetalhados?: TributosDetalhados
   produtos: Produto[]
 }
 
@@ -16,6 +27,7 @@ export interface GastosMensais {
   mesNumero: number
   ano: number
   total: number
+  totalTributos?: number
   notas: NotaFiscal[]
 }
 
@@ -26,6 +38,11 @@ export interface NotaFiscalResponse {
   estabelecimento: string
   valorTotal: number
   valorPago: number
+  formaPagamento?: string
+  tipoPagamento?: string
+  cartaoUsado?: string
+  valorTributos?: number
+  tributosDetalhados?: TributosDetalhados
   produtos: Array<{
     nome: string
     quantidade: number

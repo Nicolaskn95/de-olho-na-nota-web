@@ -23,7 +23,11 @@ import {
   CheckCircle2,
   AlertCircle,
   ScanLine,
+  CreditCard,
+  Landmark,
+  Pencil,
 } from 'lucide-react'
+import { ModalEditarNotaFiscal } from '@/components/ModalEditarNotaFiscal'
 
 const Scanner = dynamic(
   () => import('@yudiel/react-qr-scanner').then((mod) => mod.Scanner),
@@ -48,6 +52,7 @@ export function EscanearCupom() {
   const [passoTour, setPassoTour] = useState(0)
   /** Indica que a nota veio via chave (barcode) e não via URL */
   const [processadoViaChave, setProcessadoViaChave] = useState(false)
+  const [modalEditarAberto, setModalEditarAberto] = useState(false)
 
   const passosTour = useMemo<Step[]>(
     () => [
@@ -671,7 +676,7 @@ export function EscanearCupom() {
             </div>
           )}
 
-          <div className="grid gap-2 mb-6">
+          <div className="grid sm:grid-cols-2 gap-3 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
             <p className="text-sm">
               <strong className="text-gray-700">Estabelecimento:</strong>{' '}
               {notaProcessada.estabelecimento}
@@ -688,6 +693,31 @@ export function EscanearCupom() {
               <strong className="text-gray-700">Valor Pago:</strong> R${' '}
               {notaProcessada.valorPago.toFixed(2)}
             </p>
+            <div className="text-sm flex flex-wrap items-center justify-between sm:col-span-2 pt-2 border-t border-gray-200 gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 text-xs border border-blue-200 font-medium">
+                  <CreditCard className="h-3.5 w-3.5 text-blue-600" />
+                  {notaProcessada.tipoPagamento || notaProcessada.formaPagamento || 'Pagamento não especificado'}
+                  {notaProcessada.cartaoUsado ? ` • ${notaProcessada.cartaoUsado}` : ''}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-900 text-xs border border-amber-200 font-medium">
+                  <Landmark className="h-3.5 w-3.5 text-amber-700" />
+                  {notaProcessada.valorTributos && notaProcessada.valorTributos > 0
+                    ? `Tributos: R$ ${notaProcessada.valorTributos.toFixed(2)} (${((notaProcessada.valorTributos / (notaProcessada.valorTotal || 1)) * 100).toFixed(1)}%)`
+                    : 'Tributos não informados'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalEditarAberto(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer"
+              >
+                <Pencil className="h-3 w-3" />
+                Editar pagamento & impostos
+              </button>
+            </div>
           </div>
 
           <h3 className="text-base font-medium text-gray-700 border-b border-gray-200 pb-2 mb-3">
@@ -725,6 +755,26 @@ export function EscanearCupom() {
           </div>
         </section>
       )}
+
+      <ModalEditarNotaFiscal
+        open={modalEditarAberto}
+        onClose={() => setModalEditarAberto(false)}
+        nota={notaProcessada as any}
+        onSalvo={(notaAtualizada) => {
+          setNotaProcessada((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  tipoPagamento: notaAtualizada.tipoPagamento,
+                  formaPagamento: notaAtualizada.formaPagamento,
+                  cartaoUsado: notaAtualizada.cartaoUsado,
+                  valorTributos: notaAtualizada.valorTributos,
+                  tributosDetalhados: notaAtualizada.tributosDetalhados,
+                }
+              : null,
+          )
+        }}
+      />
     </div>
   )
 }

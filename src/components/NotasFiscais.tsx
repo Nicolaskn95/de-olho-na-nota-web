@@ -8,8 +8,10 @@ import {
   type CompraProduto,
   type ProdutoAgrupado,
 } from "@/components/ModalTodosProdutos";
+import { ModalEditarNotaFiscal } from "@/components/ModalEditarNotaFiscal";
 import { getAccessToken, getAuthHeaders } from "@/lib/auth-api";
 import { Loader } from "@/components/Loader";
+import { CreditCard, Landmark, Pencil } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -24,6 +26,8 @@ export function NotasFiscais() {
   const [prefixos, setPrefixos] = useState<Prefixo[]>([]);
   const [modalProdutosAberto, setModalProdutosAberto] = useState(false);
   const [classificandoNotaId, setClassificandoNotaId] = useState<string | null>(null);
+  const [notaParaEditar, setNotaParaEditar] = useState<NotaFiscal | null>(null);
+  const [modalEditarAberto, setModalEditarAberto] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -151,6 +155,31 @@ export function NotasFiscais() {
     }
   };
 
+  const handleNotaAtualizada = (notaAtualizada: NotaFiscal) => {
+    const novasNotas = notas.map((n) =>
+      n._id === notaAtualizada._id ? { ...n, ...notaAtualizada } : n,
+    );
+    setNotas(novasNotas);
+    calcularGastosPorMes(novasNotas);
+
+    if (mesSelecionado) {
+      const notasMes = mesSelecionado.notas.map((n) =>
+        n._id === notaAtualizada._id ? { ...n, ...notaAtualizada } : n,
+      );
+      const novoTotal = notasMes.reduce((acc, curr) => acc + curr.valorPago, 0);
+      const novoTotalTributos = notasMes.reduce(
+        (acc, curr) => acc + (curr.valorTributos || 0),
+        0,
+      );
+      setMesSelecionado({
+        ...mesSelecionado,
+        total: novoTotal,
+        totalTributos: novoTotalTributos,
+        notas: notasMes,
+      });
+    }
+  };
+
   const calcularGastosPorMes = (notas: NotaFiscal[]) => {
     const gastosMapa = new Map<string, GastosMensais>();
 
@@ -181,12 +210,14 @@ export function NotasFiscais() {
           mesNumero: mes,
           ano,
           total: 0,
+          totalTributos: 0,
           notas: [],
         });
       }
 
       const gastos = gastosMapa.get(chave)!;
       gastos.total += nota.valorPago;
+      gastos.totalTributos = (gastos.totalTributos || 0) + (nota.valorTributos || 0);
       gastos.notas.push(nota);
     }
 
@@ -353,6 +384,12 @@ export function NotasFiscais() {
                       {gastos.notas.length} nota
                       {gastos.notas.length !== 1 ? "s" : ""}
                     </p>
+                    {gastos.totalTributos && gastos.totalTributos > 0 ? (
+                      <p className="text-xs text-amber-700 font-medium mt-0.5 flex items-center gap-1">
+                        <Landmark className="w-3 h-3" />
+                        Tributos: {formatarMoeda(gastos.totalTributos)}
+                      </p>
+                    ) : null}
                   </div>
                   <p className="font-semibold text-green-700">
                     {formatarMoeda(gastos.total)}
@@ -382,7 +419,7 @@ export function NotasFiscais() {
                       key={nota._id}
                       className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
                     >
-                      <div className="flex justify-between items-start mb-3">
+                      <div className="flex justify-between items-start mb-2">
                         <div>
                           <h3 className="font-medium text-gray-800">
                             {nota.estabelecimento}
@@ -394,6 +431,53 @@ export function NotasFiscais() {
                         <p className="text-lg font-bold text-green-700">
                           {formatarMoeda(nota.valorPago)}
                         </p>
+                      </div>
+
+                      {/* Badges de Pagamento, Cartão Usado e Tributos */}
+                      <div className="flex flex-wrap items-center gap-2 my-2.5 text-xs">
+                        <div
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200"
+                          title={
+                            nota.cartaoUsado
+                              ? `Forma: ${nota.tipoPagamento || nota.formaPagamento || "Não informada"} | Cartão: ${nota.cartaoUsado}`
+                              : `Forma: ${nota.tipoPagamento || nota.formaPagamento || "Não informada"}`
+                          }
+                        >
+                          <CreditCard className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span className="font-medium">
+                            {nota.tipoPagamento || nota.formaPagamento || "Pagamento não especificado"}
+                            {nota.cartaoUsado ? ` • ${nota.cartaoUsado}` : ""}
+                          </span>
+                        </div>
+
+                        <div
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-900 border border-amber-200"
+                          title={
+                            nota.tributosDetalhados
+                              ? `Federal: ${formatarMoeda(nota.tributosDetalhados.federal || 0)} | Estadual: ${formatarMoeda(nota.tributosDetalhados.estadual || 0)} | Municipal: ${formatarMoeda(nota.tributosDetalhados.municipal || 0)}`
+                              : undefined
+                          }
+                        >
+                          <Landmark className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                          <span className="font-medium">
+                            {nota.valorTributos && nota.valorTributos > 0
+                              ? `Tributos: ${formatarMoeda(nota.valorTributos)} (${((nota.valorTributos / (nota.valorTotal || nota.valorPago || 1)) * 100).toFixed(1)}%)`
+                              : "Tributos não informados"}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNotaParaEditar(nota);
+                            setModalEditarAberto(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:text-gray-900 transition-colors ml-auto font-medium cursor-pointer"
+                          title="Editar tipo de pagamento, cartão e impostos"
+                        >
+                          <Pencil className="w-3 h-3 text-gray-500" />
+                          <span>Editar dados</span>
+                        </button>
                       </div>
 
                       {nota.produtos.length > 0 && (
@@ -505,6 +589,16 @@ export function NotasFiscais() {
         open={modalProdutosAberto}
         onClose={() => setModalProdutosAberto(false)}
         produtos={produtosAgrupadosPorNome}
+      />
+
+      <ModalEditarNotaFiscal
+        open={modalEditarAberto}
+        onClose={() => {
+          setModalEditarAberto(false);
+          setNotaParaEditar(null);
+        }}
+        nota={notaParaEditar}
+        onSalvo={handleNotaAtualizada}
       />
     </div>
   );
