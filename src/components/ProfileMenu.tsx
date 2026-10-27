@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Image as ImageIcon, LogOut, Palette, Settings, User } from "lucide-react";
+import { Image as ImageIcon, LogOut, Palette, Settings, Tags, User } from "lucide-react";
 import { clearSession, getAuthUser } from "@/lib/auth-api";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useSessionProfileColor } from "@/lib/profile-color";
@@ -94,6 +94,15 @@ export function ProfileMenu() {
             </Link>
 
             <Link
+              href="/categorias"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/95 hover:bg-white/15 transition-colors group"
+            >
+              <Tags className="h-4 w-4 text-white/70 group-hover:text-white" />
+              <span>Categorias & Prefixos</span>
+            </Link>
+
+            <Link
               href="/configuracoes"
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/95 hover:bg-white/15 transition-colors group"
@@ -118,5 +127,3 @@ export function ProfileMenu() {
     </div>
   );
 }
-
-

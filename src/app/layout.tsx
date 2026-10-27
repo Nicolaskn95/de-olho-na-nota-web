@@ -1,15 +1,41 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import Link from "next/link";
 import "./globals.css";
+import { PwaRegistration } from "@/components/PwaRegistration";
 
 const inter = Inter({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#047857",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
   title: "De Olho na Nota",
-  description: "Escaneie QR codes de cupons fiscais e extraia os produtos",
+  description: "Escaneie QR codes de cupons fiscais, organize produtos e acompanhe seus gastos",
+  applicationName: "De Olho na Nota",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "De Olho na Nota",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -19,7 +45,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className="antialiased">{children}</body>
+      <head>
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
+      <body className={`${inter.className} antialiased`}>
+        <PwaRegistration />
+        {children}
+      </body>
     </html>
   );
 }
