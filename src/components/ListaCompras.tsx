@@ -57,7 +57,15 @@ export function ListaCompras() {
   const [processandoVoz, setProcessandoVoz] = useState<boolean>(false);
   const [vozFeedback, setVozFeedback] = useState<{ tipo: "sucesso" | "erro"; msg: string } | null>(null);
   const [suportaReconhecimentoVoz, setSuportaReconhecimentoVoz] = useState<boolean>(true);
+
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const latestTranscriptRef = useRef<string>("");
+  const usarGravadorAudioRef = useRef<boolean>(false);
+  const textareaVozRef = useRef<HTMLTextAreaElement | null>(null);
+  const inputVozAtivaRef = useRef<HTMLInputElement | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMercados, setLoadingMercados] = useState<boolean>(true);
@@ -73,12 +81,26 @@ export function ListaCompras() {
   const [pendingChanges, setPendingChanges] = useState<{ index: number; comprado: boolean }[]>([]);
   const [changeCount, setChangeCount] = useState<number>(0);
 
-  // Check browser Web Speech API support
+  // Check browser Web Speech API / MediaRecorder support on iPhone & mobile
   useEffect(() => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognition) {
+      const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      const isStandalonePwa =
+        (window.navigator as any).standalone === true ||
+        window.matchMedia("(display-mode: standalone)").matches;
+      const isIOS =
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      // No iOS em modo PWA instalado na tela de início, o webkitSpeechRecognition é bloqueado pelo WebKit;
+      // usamos MediaRecorder + Gemini Audio diretamente se disponível.
+      if (isIOS && isStandalonePwa && hasMediaDevices) {
+        usarGravadorAudioRef.current = true;
+      }
+
+      if (!SpeechRecognition && !hasMediaDevices) {
         setSuportaReconhecimentoVoz(false);
       }
     }
@@ -167,7 +189,7 @@ export function ListaCompras() {
     loadExistingList();
   }, [fetchApelidos, loadExistingList]);
 
-  // Cleanup speech recognition on unmount
+  // Cleanup speech recognition & audio stream on unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -176,6 +198,9 @@ export function ListaCompras() {
         } catch {
           // ignore
         }
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, []);
@@ -206,7 +231,41 @@ export function ListaCompras() {
     }
   }, [changeCount, pendingChanges, syncBatchChanges]);
 
-  // ==================== COMANDO DE VOZ (WEB SPEECH API + PLN) ====================
+  // ==================== COMANDO DE VOZ (IPHONE / SAFARI / PWA / ANDROID) ====================
+
+  const processarRespostaVozBackend = useCallback(
+    (data: any, naListaAtiva: boolean) => {
+      if (naListaAtiva) {
+        setLista(data);
+        setVozFeedback({
+          tipo: "sucesso",
+          msg: "Itens adicionados e vinculados com o histórico do mercado!",
+        });
+      } else {
+        if (data?.rascunho?.itens) {
+          setRascunhoItens(data.rascunho.itens);
+        }
+        const qtdExtraidos = Array.isArray(data?.itensExtraidos)
+          ? data.itensExtraidos.length
+          : 1;
+        const resumoExtraidos = Array.isArray(data?.itensExtraidos)
+          ? data.itensExtraidos
+              .map((i: ItemRascunho) => `${i.quantidade} ${i.unidade} ${i.termoFalado}`)
+              .join(", ")
+          : "";
+
+        setVozFeedback({
+          tipo: "sucesso",
+          msg: `${qtdExtraidos} item(ns) anotado(s): ${resumoExtraidos}`,
+        });
+      }
+
+      setTextoComandoVoz("");
+      setInterimTranscript("");
+      latestTranscriptRef.current = "";
+    },
+    []
+  );
 
   const enviarTextoComandoVoz = useCallback(
     async (textoParaEnviar: string, naListaAtiva = false) => {
@@ -235,34 +294,7 @@ export function ListaCompras() {
         }
 
         const data = await res.json();
-
-        if (naListaAtiva) {
-          setLista(data);
-          setVozFeedback({
-            tipo: "sucesso",
-            msg: "Itens adicionados e vinculados com o histórico do mercado!",
-          });
-        } else {
-          if (data?.rascunho?.itens) {
-            setRascunhoItens(data.rascunho.itens);
-          }
-          const qtdExtraidos = Array.isArray(data?.itensExtraidos)
-            ? data.itensExtraidos.length
-            : 1;
-          const resumoExtraidos = Array.isArray(data?.itensExtraidos)
-            ? data.itensExtraidos
-                .map((i: ItemRascunho) => `${i.quantidade} ${i.unidade} ${i.termoFalado}`)
-                .join(", ")
-            : "";
-
-          setVozFeedback({
-            tipo: "sucesso",
-            msg: `${qtdExtraidos} item(ns) anotado(s): ${resumoExtraidos}`,
-          });
-        }
-
-        setTextoComandoVoz("");
-        setInterimTranscript("");
+        processarRespostaVozBackend(data, naListaAtiva);
       } catch (err: any) {
         setVozFeedback({
           tipo: "erro",
@@ -272,81 +304,261 @@ export function ListaCompras() {
         setProcessandoVoz(false);
       }
     },
-    []
+    [processarRespostaVozBackend]
+  );
+
+  const enviarAudioComandoVoz = useCallback(
+    async (audioBase64: string, mimeType: string, naListaAtiva = false) => {
+      if (!audioBase64) return;
+
+      try {
+        setProcessandoVoz(true);
+        setVozFeedback(null);
+
+        const endpoint = naListaAtiva
+          ? `${API_URL}/lista-compras/voz-ativa`
+          : `${API_URL}/lista-compras/rascunho/voz`;
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ audioBase64, mimeType }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(
+            errData?.message ||
+              "Não foi possível transcrever o áudio. Tente falar mais próximo ao microfone."
+          );
+        }
+
+        const data = await res.json();
+        processarRespostaVozBackend(data, naListaAtiva);
+      } catch (err: any) {
+        setVozFeedback({
+          tipo: "erro",
+          msg: err?.message || "Erro ao processar áudio de voz.",
+        });
+      } finally {
+        setProcessandoVoz(false);
+      }
+    },
+    [processarRespostaVozBackend]
+  );
+
+  const iniciarGravacaoMediaRecorder = useCallback(
+    async (naListaAtiva = false) => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Microfone indisponível neste navegador.");
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        audioChunksRef.current = [];
+
+        // Escolhe o formato suportado pelo iPhone (audio/mp4) ou Chrome/Android (audio/webm)
+        const mimeTypesPreferidos = [
+          "audio/mp4",
+          "audio/webm;codecs=opus",
+          "audio/webm",
+          "audio/ogg",
+        ];
+        let mimeEscolhido = "";
+        if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported) {
+          for (const m of mimeTypesPreferidos) {
+            if (MediaRecorder.isTypeSupported(m)) {
+              mimeEscolhido = m;
+              break;
+            }
+          }
+        }
+
+        const recorder = mimeEscolhido
+          ? new MediaRecorder(stream, { mimeType: mimeEscolhido })
+          : new MediaRecorder(stream);
+
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        recorder.onstop = () => {
+          setIsListening(false);
+          const mimeFinal = recorder.mimeType || mimeEscolhido || "audio/mp4";
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeFinal });
+
+          if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+            mediaStreamRef.current = null;
+          }
+
+          if (audioBlob.size < 200) {
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64data = String(reader.result || "");
+            if (base64data) {
+              enviarAudioComandoVoz(base64data, mimeFinal, naListaAtiva);
+            }
+          };
+          reader.readAsDataURL(audioBlob);
+        };
+
+        recorder.start();
+        setIsListening(true);
+        setInterimTranscript("Gravando áudio... Fale os itens e toque para enviar.");
+      } catch (err: any) {
+        setIsListening(false);
+        // Foca o campo de texto para permitir usar o Ditado nativo do teclado do iPhone
+        if (naListaAtiva) {
+          inputVozAtivaRef.current?.focus();
+        } else {
+          textareaVozRef.current?.focus();
+        }
+        setVozFeedback({
+          tipo: "erro",
+          msg: "Para falar no iPhone sem HTTPS ou sem permissão do Safari, toque no ícone de microfone 🎙️ no teclado do iPhone que acabou de abrir!",
+        });
+      }
+    },
+    [enviarAudioComandoVoz]
   );
 
   const toggleMicrofone = (naListaAtiva = false) => {
+    // 1. Se já estiver ouvindo/gravando, para e envia
     if (isListening) {
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state === "recording"
+      ) {
+        mediaRecorderRef.current.stop();
+        return;
+      }
+
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
       }
       setIsListening(false);
-      const textoFinal = `${textoComandoVoz} ${interimTranscript}`.trim();
-      if (textoFinal) {
-        enviarTextoComandoVoz(textoFinal, naListaAtiva);
+      const textoCapturado = (
+        latestTranscriptRef.current ||
+        `${textoComandoVoz} ${interimTranscript}`
+      ).trim();
+
+      if (textoCapturado) {
+        latestTranscriptRef.current = "";
+        enviarTextoComandoVoz(textoCapturado, naListaAtiva);
       }
       return;
     }
 
     if (typeof window === "undefined") return;
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      setSuportaReconhecimentoVoz(false);
+    // 2. Se estiver acessando no iPhone via IP local HTTP (sem HTTPS), o iOS bloqueia APIs de microfone no browser.
+    // Focamos imediatamente o input/textarea para abrir o teclado do iPhone com o botão de Ditado da Apple (🎙️).
+    if (!window.isSecureContext) {
+      if (naListaAtiva) {
+        inputVozAtivaRef.current?.focus();
+      } else {
+        textareaVozRef.current?.focus();
+      }
       setVozFeedback({
         tipo: "erro",
-        msg: "Seu navegador não suporta captura direta de microfone. Digite ou use o microfone do teclado!",
+        msg: "Em conexão local HTTP no iPhone, o iOS exige HTTPS para microfone direto. Use o microfone 🎙️ do teclado do iPhone no campo selecionado!",
       });
       return;
     }
 
     setVozFeedback(null);
     setInterimTranscript("");
+    latestTranscriptRef.current = textoComandoVoz ? `${textoComandoVoz} ` : "";
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "pt-BR";
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    let acumuladoSessao = textoComandoVoz ? `${textoComandoVoz} ` : "";
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
+    // 3. Se estiver no modo fallback de gravação de áudio (ex: PWA instalado no iPhone ou Chrome iOS)
+    if (!SpeechRecognition || usarGravadorAudioRef.current) {
+      iniciarGravacaoMediaRecorder(naListaAtiva);
+      return;
+    }
 
-    recognition.onresult = (event: any) => {
-      let provisorio = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          acumuladoSessao += transcript + ", ";
-          setTextoComandoVoz(acumuladoSessao.trim());
-        } else {
-          provisorio += transcript;
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "pt-BR";
+      // No iOS Safari, continuous=true causa travamento ou descarte do áudio no WebKit
+      recognition.continuous = !isIOS;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      let acumuladoFinal = textoComandoVoz ? `${textoComandoVoz} ` : "";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let provisorio = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            acumuladoFinal += transcript + ", ";
+            setTextoComandoVoz(acumuladoFinal.trim());
+          } else {
+            provisorio += transcript;
+          }
         }
-      }
-      setInterimTranscript(provisorio);
-    };
+        setInterimTranscript(provisorio);
+        latestTranscriptRef.current = `${acumuladoFinal} ${provisorio}`.trim();
+      };
 
-    recognition.onerror = (event: any) => {
-      console.warn("SpeechRecognition error:", event.error);
-      setIsListening(false);
-      if (event.error === "not-allowed") {
-        setVozFeedback({
-          tipo: "erro",
-          msg: "Permissão de microfone negada. Habilite o microfone no navegador.",
-        });
-      }
-    };
+      recognition.onerror = (event: any) => {
+        console.warn("SpeechRecognition error:", event.error);
+        setIsListening(false);
 
-    recognition.onend = () => {
-      setIsListening(false);
-      setInterimTranscript("");
-    };
+        // No iPhone (PWA ou Safari com restrição de Siri/Ditado WebKit), faz fallback automático para MediaRecorder + Gemini Audio
+        if (
+          event.error === "service-not-allowed" ||
+          event.error === "not-allowed" ||
+          event.error === "network"
+        ) {
+          usarGravadorAudioRef.current = true;
+          iniciarGravacaoMediaRecorder(naListaAtiva);
+        }
+      };
 
-    recognitionRef.current = recognition;
-    recognition.start();
+      recognition.onend = () => {
+        setIsListening(false);
+        setInterimTranscript("");
+
+        // No iPhone (continuous=false), o iOS encerra sozinho após a pessoa falar.
+        // Enviamos automaticamente o texto capturado em latestTranscriptRef!
+        const textoCapturado = latestTranscriptRef.current.trim();
+        if (textoCapturado) {
+          latestTranscriptRef.current = "";
+          enviarTextoComandoVoz(textoCapturado, naListaAtiva);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      usarGravadorAudioRef.current = true;
+      iniciarGravacaoMediaRecorder(naListaAtiva);
+    }
   };
 
   // ==================== MANIPULAÇÃO DO RASCUNHO ====================
@@ -680,20 +892,24 @@ export function ListaCompras() {
 
                     <div className="relative">
                       <textarea
+                        ref={textareaVozRef}
                         rows={2}
                         value={
                           isListening && interimTranscript
                             ? `${textoComandoVoz} ${interimTranscript}`.trim()
                             : textoComandoVoz
                         }
-                        onChange={(e) => setTextoComandoVoz(e.target.value)}
+                        onChange={(e) => {
+                          setTextoComandoVoz(e.target.value);
+                          latestTranscriptRef.current = e.target.value;
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             enviarTextoComandoVoz(textoComandoVoz, false);
                           }
                         }}
-                        placeholder="Aperte o microfone e fale, ou digite aqui os itens separados por vírgula..."
+                        placeholder="Aperte o microfone e fale, ou digite/dite pelo teclado aqui os itens..."
                         className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 pr-14 text-sm text-gray-800 focus:outline-none focus:border-green-500 transition-colors resize-none"
                       />
                       <button
@@ -725,7 +941,7 @@ export function ListaCompras() {
                     {!suportaReconhecimentoVoz && (
                       <p className="text-xs text-amber-600 flex items-center gap-1.5">
                         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        Dica: Use o ícone de microfone do teclado do celular ou digite os itens acima.
+                        Dica: Use o ícone de microfone 🎙️ do teclado do celular ou digite os itens acima.
                       </p>
                     )}
 
@@ -1016,13 +1232,17 @@ export function ListaCompras() {
             </button>
 
             <input
+              ref={inputVozAtivaRef}
               type="text"
               value={
                 isListening && interimTranscript
                   ? `${textoComandoVoz} ${interimTranscript}`.trim()
                   : textoComandoVoz
               }
-              onChange={(e) => setTextoComandoVoz(e.target.value)}
+              onChange={(e) => {
+                setTextoComandoVoz(e.target.value);
+                latestTranscriptRef.current = e.target.value;
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
