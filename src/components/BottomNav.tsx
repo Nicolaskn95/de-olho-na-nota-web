@@ -65,7 +65,7 @@ export function BottomNav() {
                 aria-label={item.label}
                 className="relative flex flex-col items-center justify-center flex-1 -mt-6 group active:scale-95 transition-transform duration-200"
               >
-                {/* Botão Central Flutuante em Destaque (FAB) */}
+                {/* Botão Central Flutuante em Destaque (FAB) - sem efeito de onda */}
                 <div
                   className={`relative flex items-center justify-center w-14 h-14 rounded-full text-white ring-4 ring-white dark:ring-slate-950 transition-all duration-300 ${
                     active ? "scale-105" : "group-hover:scale-105"
@@ -77,12 +77,6 @@ export function BottomNav() {
                       : `0 6px 16px ${primaryColor}55`,
                   }}
                 >
-                  {active && (
-                    <span
-                      className="absolute inset-0 rounded-full animate-ping opacity-20"
-                      style={{ backgroundColor: primaryColor }}
-                    />
-                  )}
                   <IconComponent className="w-6 h-6 text-white relative z-10" />
                 </div>
 

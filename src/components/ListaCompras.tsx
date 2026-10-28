@@ -87,16 +87,14 @@ export function ListaCompras() {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-      const isStandalonePwa =
-        (window.navigator as any).standalone === true ||
-        window.matchMedia("(display-mode: standalone)").matches;
       const isIOS =
         /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-      // No iOS em modo PWA instalado na tela de início, o webkitSpeechRecognition é bloqueado pelo WebKit;
-      // usamos MediaRecorder + Gemini Audio diretamente se disponível.
-      if (isIOS && isStandalonePwa && hasMediaDevices) {
+      // No iPhone/iOS (seja Safari, PWA na tela de início ou Chrome iOS), o webkitSpeechRecognition
+      // perde o stream de áudio durante o popup de permissão ou fica mudo sem emitir onresult.
+      // Por isso, no iOS usamos diretamente o MediaRecorder + Gemini Audio (com await getUserMedia antes de iniciar!).
+      if (isIOS && hasMediaDevices) {
         usarGravadorAudioRef.current = true;
       }
 
@@ -253,10 +251,13 @@ export function ListaCompras() {
               .map((i: ItemRascunho) => `${i.quantidade} ${i.unidade} ${i.termoFalado}`)
               .join(", ")
           : "";
+        const fraseTranscrita = data?.textoTranscrito
+          ? `"${data.textoTranscrito}" → `
+          : "";
 
         setVozFeedback({
           tipo: "sucesso",
-          msg: `${qtdExtraidos} item(ns) anotado(s): ${resumoExtraidos}`,
+          msg: `${fraseTranscrita}${qtdExtraidos} item(ns) anotado(s): ${resumoExtraidos}`,
         });
       }
 
@@ -389,6 +390,7 @@ export function ListaCompras() {
 
         recorder.onstop = () => {
           setIsListening(false);
+          setInterimTranscript("");
           const mimeFinal = recorder.mimeType || mimeEscolhido || "audio/mp4";
           const audioBlob = new Blob(audioChunksRef.current, { type: mimeFinal });
 
@@ -411,10 +413,13 @@ export function ListaCompras() {
           reader.readAsDataURL(audioBlob);
         };
 
-        recorder.start();
+        // Passa timeslice de 250ms para garantir que o Safari iOS grave os chunks de áudio continuamente
+        recorder.start(250);
         setIsListening(true);
-        setInterimTranscript("Gravando áudio... Fale os itens e toque para enviar.");
-      } catch (err: any) {
+        setInterimTranscript(
+          "Ouvindo sua voz... Fale os itens e toque no botão vermelho para enviar."
+        );
+      } catch {
         setIsListening(false);
         // Foca o campo de texto para permitir usar o Ditado nativo do teclado do iPhone
         if (naListaAtiva) {
@@ -490,8 +495,8 @@ export function ListaCompras() {
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-    // 3. Se estiver no modo fallback de gravação de áudio (ex: PWA instalado no iPhone ou Chrome iOS)
-    if (!SpeechRecognition || usarGravadorAudioRef.current) {
+    // 3. No iOS (iPhone/iPad) ou quando usarGravadorAudioRef estiver ativo, usa MediaRecorder + Gemini Audio diretamente
+    if (!SpeechRecognition || isIOS || usarGravadorAudioRef.current) {
       iniciarGravacaoMediaRecorder(naListaAtiva);
       return;
     }
@@ -499,8 +504,7 @@ export function ListaCompras() {
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = "pt-BR";
-      // No iOS Safari, continuous=true causa travamento ou descarte do áudio no WebKit
-      recognition.continuous = !isIOS;
+      recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
@@ -529,7 +533,6 @@ export function ListaCompras() {
         console.warn("SpeechRecognition error:", event.error);
         setIsListening(false);
 
-        // No iPhone (PWA ou Safari com restrição de Siri/Ditado WebKit), faz fallback automático para MediaRecorder + Gemini Audio
         if (
           event.error === "service-not-allowed" ||
           event.error === "not-allowed" ||
@@ -544,8 +547,6 @@ export function ListaCompras() {
         setIsListening(false);
         setInterimTranscript("");
 
-        // No iPhone (continuous=false), o iOS encerra sozinho após a pessoa falar.
-        // Enviamos automaticamente o texto capturado em latestTranscriptRef!
         const textoCapturado = latestTranscriptRef.current.trim();
         if (textoCapturado) {
           latestTranscriptRef.current = "";
@@ -854,9 +855,6 @@ export function ListaCompras() {
                       }}
                       title={isListening ? "Toque para finalizar e adicionar" : "Toque para falar"}
                     >
-                      {isListening && (
-                        <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-30"></span>
-                      )}
                       {processandoVoz ? (
                         <Loader2 className="w-10 h-10 animate-spin" />
                       ) : isListening ? (
@@ -867,7 +865,7 @@ export function ListaCompras() {
                     </button>
                     <span className="mt-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
                       {isListening
-                        ? "Ouvindo... Toque p/ concluir"
+                        ? "Ouvindo... Toque p/ enviar"
                         : processandoVoz
                         ? "Extraindo com PLN..."
                         : "Toque para falar"}
